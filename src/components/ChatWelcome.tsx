@@ -13,6 +13,7 @@ const suggestions = [
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  citations?: Array<{ file_id: string; quote?: string }>;
 }
 
 export const ChatWelcome = () => {
@@ -31,7 +32,7 @@ export const ChatWelcome = () => {
     scrollToBottom();
   }, [messages]);
 
-  const pollRunStatus = async (threadId: string, runId: string): Promise<string> => {
+  const pollRunStatus = async (threadId: string, runId: string): Promise<{ text: string; citations?: Array<{ file_id: string; quote?: string }> }> => {
     const maxAttempts = 60; // 60 seconds max
     let attempts = 0;
 
@@ -51,7 +52,7 @@ export const ChatWelcome = () => {
       console.log('Poll result:', data);
 
       if (data.status === 'completed') {
-        return data.text;
+        return { text: data.text, citations: data.citations };
       } else if (data.status === 'failed' || data.status === 'cancelled' || data.status === 'expired') {
         throw new Error(data.error || 'Run failed');
       }
@@ -101,14 +102,15 @@ export const ChatWelcome = () => {
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
       // Poll for completion
-      const assistantText = await pollRunStatus(data.threadId, data.runId);
+      const result = await pollRunStatus(data.threadId, data.runId);
       
       // Update assistant message
       setMessages(prev => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = {
           role: 'assistant',
-          content: assistantText
+          content: result.text,
+          citations: result.citations
         };
         return newMessages;
       });
@@ -204,7 +206,22 @@ export const ChatWelcome = () => {
                 }`}
               >
                 {msg.content ? (
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  <>
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-border/40">
+                        <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
+                        {msg.citations.map((citation, idx) => (
+                          <div key={idx} className="text-xs text-muted-foreground mb-2">
+                            <span className="font-medium">• Bron {idx + 1}</span>
+                            {citation.quote && (
+                              <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                 )}

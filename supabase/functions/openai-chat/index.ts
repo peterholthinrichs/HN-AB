@@ -47,17 +47,32 @@ serve(async (req) => {
         const lastMessage = messagesData.data[0];
         
         let text = '';
+        const citations: Array<{ file_id: string; quote?: string }> = [];
+        
         if (lastMessage?.role === 'assistant' && lastMessage.content) {
           for (const content of lastMessage.content) {
             if (content.type === 'text' && content.text?.value) {
               text += content.text.value;
+              
+              // Extract citations from annotations
+              if (content.text?.annotations) {
+                for (const annotation of content.text.annotations) {
+                  if (annotation.type === 'file_citation' && annotation.file_citation) {
+                    citations.push({
+                      file_id: annotation.file_citation.file_id,
+                      quote: annotation.file_citation.quote
+                    });
+                  }
+                }
+              }
             }
           }
         }
 
         return new Response(JSON.stringify({ 
           status: 'completed', 
-          text 
+          text,
+          citations
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
