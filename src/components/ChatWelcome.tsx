@@ -213,21 +213,28 @@ export const ChatWelcome = () => {
                     {msg.role === "assistant" && msg.citations && msg.citations.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-border/40">
                         <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
-                        {msg.citations.map((citation, idx) => (
-                          <div key={idx} className="text-xs text-muted-foreground mb-2">
-                            <span className="font-medium">
-                              • <a 
-                                  href="https://drive.google.com/drive/folders/1eZMAAU_wOE3vZ67KPCr8MFRScbjz3zcf" 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="hover:underline hover:text-foreground transition-colors"
-                                >
-                                  {citation.filename || `Bron ${idx + 1}`}
-                                </a>
-                            </span>
-                            {citation.quote && <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>}
-                          </div>
-                        ))}
+                        {msg.citations.map((citation, idx) => {
+                          // Convert .txt extension to .pdf for document links
+                          const filename = citation.filename || `Bron ${idx + 1}`;
+                          const pdfFilename = filename.replace(/\.txt$/, '.pdf');
+                          const documentUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/documents/${pdfFilename}`;
+                          
+                          return (
+                            <div key={idx} className="text-xs text-muted-foreground mb-2">
+                              <span className="font-medium">
+                                • <a 
+                                    href={documentUrl}
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="hover:underline hover:text-foreground transition-colors"
+                                  >
+                                    {filename}
+                                  </a>
+                              </span>
+                              {citation.quote && <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </>
