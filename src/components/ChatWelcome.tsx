@@ -257,7 +257,7 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
                                       e.currentTarget.href = storageUrl;
                                     }}
                                   >
-                                    {filename}
+                                    {pdfFilename}
                                   </a>
                               </span>
                               {citation.quote && <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>}
