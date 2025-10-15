@@ -1,4 +1,4 @@
-import { Plus, MoreVertical, ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
+import { Plus, MoreVertical, ChevronDown, ChevronRight, MessageSquare, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,9 @@ import henkAvatar from "@/assets/henk-avatar.png";
 import hrAvatar from "@/assets/hr-avatar.png";
 import { ChatSession } from "@/types/chat";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { logout } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 interface Colleague {
   id: string;
@@ -40,6 +43,17 @@ export const ChatSidebar = ({
   onSelectChat 
 }: ChatSidebarProps) => {
   const [isEngineerExpanded, setIsEngineerExpanded] = useState(true);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleLogout = () => {
+    logout();
+    toast({
+      title: "Uitgelogd",
+      description: "Je bent succesvol uitgelogd",
+    });
+    navigate("/login");
+  };
 
   const formatTimestamp = (timestamp: number) => {
     const now = Date.now();
@@ -163,8 +177,14 @@ export const ChatSidebar = ({
             <span className="text-accent-foreground font-bold text-sm">PT</span>
           </div>
           <span className="font-medium text-foreground text-sm">POOL techniek</span>
-          <Button variant="ghost" size="icon" className="ml-auto">
-            <MoreVertical className="w-4 h-4" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="ml-auto hover:bg-destructive/10 hover:text-destructive"
+            onClick={handleLogout}
+            title="Uitloggen"
+          >
+            <LogOut className="w-4 h-4" />
           </Button>
         </div>
       </div>
