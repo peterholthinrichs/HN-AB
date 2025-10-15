@@ -213,7 +213,12 @@ export const ChatWelcome = () => {
               >
                 {msg.content ? (
                   <>
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    <div 
+                      className="text-sm whitespace-pre-wrap" 
+                      dangerouslySetInnerHTML={{ 
+                        __html: msg.content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>') 
+                      }}
+                    />
                     {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-border/40">
                         <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>

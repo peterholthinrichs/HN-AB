@@ -76,9 +76,14 @@ serve(async (req) => {
         text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); // Cleanup extra lege regels
         text = text.trim();
 
-        // Fetch file metadata for each citation to get filenames
+        // Remove duplicate citations based on file_id
+        const uniqueCitations = Array.from(
+          new Map(citations.map(c => [c.file_id, c])).values()
+        );
+
+        // Fetch file metadata for each unique citation to get filenames
         const citationsWithFilenames = await Promise.all(
-          citations.map(async (citation) => {
+          uniqueCitations.map(async (citation) => {
             try {
               const fileResponse = await fetch(`https://api.openai.com/v1/files/${citation.file_id}`, {
                 headers: {
