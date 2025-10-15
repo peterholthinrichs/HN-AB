@@ -90,24 +90,28 @@ Deno.serve(async (req) => {
     // Login endpoint
     const { username, password }: LoginRequest = await req.json();
 
-    console.log('Login attempt for username:', username);
+    // Normalize and trim inputs
+    const normalizedUsername = (username || '').trim().toLowerCase();
+    const normalizedPassword = (password || '').trim();
 
-    const validUsername = Deno.env.get('AUTH_USERNAME');
-    const validPassword = Deno.env.get('AUTH_PASSWORD');
+    console.log('Login attempt for username:', normalizedUsername);
+
+    // Get and normalize expected credentials
+    const validUsername = (Deno.env.get('AUTH_USERNAME') || '').trim().toLowerCase();
+    const validPassword = (Deno.env.get('AUTH_PASSWORD') || '').trim();
 
     if (!validUsername || !validPassword) {
       console.error('AUTH credentials not configured');
       throw new Error('Authentication not properly configured');
     }
 
-    // Debug logging (without exposing actual values)
-    console.log('Username match:', username === validUsername);
-    console.log('Password length received:', password.length);
-    console.log('Expected password length:', validPassword.length);
-    console.log('Password match:', password === validPassword);
+    // Validate credentials with normalized values
+    const usernameMatch = normalizedUsername === validUsername;
+    const passwordMatch = normalizedPassword === validPassword;
 
-    // Validate credentials
-    if (username === validUsername && password === validPassword) {
+    console.log('Credentials validated');
+
+    if (usernameMatch && passwordMatch) {
       const token = await generateJWT(jwtSecret);
       
       console.log('Login successful for:', username);

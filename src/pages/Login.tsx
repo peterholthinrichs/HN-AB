@@ -17,7 +17,11 @@ export const Login = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!username.trim() || !password.trim()) {
+    // Trim inputs before validation
+    const trimmedUsername = username.trim();
+    const trimmedPassword = password.trim();
+    
+    if (!trimmedUsername || !trimmedPassword) {
       toast({
         title: "Fout",
         description: "Vul alle velden in",
@@ -36,7 +40,10 @@ export const Login = () => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ username, password }),
+          body: JSON.stringify({ 
+            username: trimmedUsername, 
+            password: trimmedPassword 
+          }),
         }
       );
 
