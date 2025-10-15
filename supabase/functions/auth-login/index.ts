@@ -100,6 +100,12 @@ Deno.serve(async (req) => {
       throw new Error('Authentication not properly configured');
     }
 
+    // Debug logging (without exposing actual values)
+    console.log('Username match:', username === validUsername);
+    console.log('Password length received:', password.length);
+    console.log('Expected password length:', validPassword.length);
+    console.log('Password match:', password === validPassword);
+
     // Validate credentials
     if (username === validUsername && password === validPassword) {
       const token = await generateJWT(jwtSecret);
