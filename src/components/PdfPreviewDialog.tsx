@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,12 @@ interface PdfPreviewDialogProps {
 export function PdfPreviewDialog({ open, onOpenChange, pdfUrl, filename }: PdfPreviewDialogProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+
+  // Reset loading and error state when PDF URL changes
+  useEffect(() => {
+    setIsLoading(true);
+    setHasError(false);
+  }, [pdfUrl]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
