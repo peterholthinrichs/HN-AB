@@ -152,7 +152,7 @@ export const ChatWelcome = () => {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Ik moet een offerte maken voor Hof Wonen voor het aanbrengen van 50m2 gevel"
+              placeholder="Wat voor werkzaamheden zijn verricht voor Holiday Ice?"
               className="w-full px-6 py-4 pr-14 rounded-2xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-sm"
               disabled={isLoading}
             />
