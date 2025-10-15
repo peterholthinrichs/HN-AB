@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
 import { Message, ChatSession } from "@/types/chat";
+import { PdfPreviewDialog } from "@/components/PdfPreviewDialog";
 
 const suggestions = [
   "Welke sensoren (Shr2, Shr3, Shr4, Shr8) zijn verplicht voor een veilige werking van de warmteterugwinning, en waar worden ze geplaatst?",
@@ -23,6 +24,10 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
   const [threadId, setThreadId] = useState<string | null>(currentSession?.threadId || null);
   const [runStatus, setRunStatus] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [pdfPreview, setPdfPreview] = useState<{
+    url: string;
+    filename: string;
+  } | null>(null);
   const { toast } = useToast();
 
   // Update session when messages or threadId change
@@ -247,18 +252,15 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
                           return (
                             <div key={idx} className="text-xs text-muted-foreground mb-2">
                               <span className="font-medium">
-                                • <a 
-                                    href={documentUrl}
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="hover:underline hover:text-foreground transition-colors"
-                                    onError={(e) => {
-                                      // Fallback to storage URL if local fails
-                                      e.currentTarget.href = storageUrl;
-                                    }}
+                                 • <button 
+                                    onClick={() => setPdfPreview({
+                                      url: documentUrl,
+                                      filename: pdfFilename
+                                    })}
+                                    className="hover:underline hover:text-foreground transition-colors cursor-pointer"
                                   >
                                     {pdfFilename}
-                                  </a>
+                                  </button>
                               </span>
                               {citation.quote && <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>}
                             </div>
@@ -311,6 +313,13 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
           </div>
         </div>
       </div>
+
+      <PdfPreviewDialog
+        open={!!pdfPreview}
+        onOpenChange={(open) => !open && setPdfPreview(null)}
+        pdfUrl={pdfPreview?.url || ''}
+        filename={pdfPreview?.filename || ''}
+      />
     </div>
   );
 };
