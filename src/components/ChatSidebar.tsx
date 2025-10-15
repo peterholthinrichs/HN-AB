@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import engineerAvatar from "@/assets/engineer-avatar.png";
 import henkAvatar from "@/assets/henk-avatar.png";
+import hrAvatar from "@/assets/hr-avatar.png";
 
 interface Colleague {
   id: string;
@@ -15,7 +16,7 @@ interface Colleague {
 const colleagues: Colleague[] = [
   { id: "1", name: "Engineer", role: "Calculator", messageCount: 3, avatar: engineerAvatar },
   { id: "2", name: "Marketing", role: "LOCKED", messageCount: 5, avatar: henkAvatar },
-  { id: "3", name: "HR", role: "LOCKED", messageCount: 16 },
+  { id: "3", name: "HR", role: "LOCKED", messageCount: 16, avatar: hrAvatar },
 ];
 
 export const ChatSidebar = () => {
