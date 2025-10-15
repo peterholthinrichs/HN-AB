@@ -12,12 +12,33 @@ serve(async (req) => {
   }
 
   try {
-    const { message, threadId } = await req.json();
+    const { message, threadId, getMessages } = await req.json();
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const ASSISTANT_ID = "asst_u9SBVjdEmMgEyJtXkiOSkZMD";
+    const VECTOR_STORE_ID = "vs_68c81b73bdbc81919aeb78d8fc10c87e";
 
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY not configured');
+    }
+
+    // Fallback: return latest assistant message for a thread
+    if (getMessages && threadId) {
+      const msgsRes = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages?limit=10`, {
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+          'OpenAI-Beta': 'assistants=v2'
+        }
+      });
+      const msgs = await msgsRes.json();
+      const firstAssistant = (msgs.data || []).find((m: any) => m.role === 'assistant');
+      let text = '';
+      if (firstAssistant?.content) {
+        for (const c of firstAssistant.content) {
+          if (c.type === 'text' && c.text?.value) text += c.text.value;
+        }
+      }
+      return new Response(JSON.stringify({ text }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     console.log('Processing message:', message);
@@ -85,7 +106,12 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         assistant_id: ASSISTANT_ID,
-        stream: true
+        stream: true,
+        tool_resources: {
+          file_search: {
+            vector_store_ids: [VECTOR_STORE_ID]
+          }
+        }
       })
     });
 

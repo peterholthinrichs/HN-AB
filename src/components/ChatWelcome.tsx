@@ -139,6 +139,28 @@ export const ChatWelcome = () => {
         }
       }
 
+      // Fallback: if no streamed text, fetch the latest assistant message
+      const tid = (response.headers.get('X-Thread-Id')) || threadId;
+      if (!assistantMessage.trim() && tid) {
+        console.log('No streamed text, fetching latest assistant message...');
+        const fallbackRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+          },
+          body: JSON.stringify({ getMessages: true, threadId: tid })
+        });
+        const { text } = await fallbackRes.json();
+        if (text) {
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1] = { role: 'assistant', content: text };
+            return newMessages;
+          });
+        }
+      }
+
       console.log('Message processing complete');
     } catch (error) {
       console.error('Error sending message:', error);
