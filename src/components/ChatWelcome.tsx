@@ -244,13 +244,8 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
                             .trim()
                             .replace(/\s+/g, '_');
                           
-                          // Use local URL as primary fallback (works immediately)
-                          // Falls back to storage URL if local file is not available
-                          const localUrl = `/documents/${pdfFilename}`;
-                          const storageUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/documents/${pdfFilename}`;
-                          
-                          // Try local first, storage as backup
-                          const documentUrl = localUrl;
+                          // Use storage URL for all PDFs
+                          const documentUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/documents/${pdfFilename}`;
                           
                           return (
                             <div key={idx} className="text-xs text-muted-foreground mb-2">
