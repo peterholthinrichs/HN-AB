@@ -15,7 +15,7 @@ serve(async (req) => {
     const { message, threadId, runId } = await req.json();
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const ASSISTANT_ID = "asst_u9SBVjdEmMgEyJtXkiOSkZMD";
-    const VECTOR_STORE_ID = "vs_68c81b73bdbc81919aeb78d8fc10c87e";
+    const VECTOR_STORE_ID = "vs_68ef575ffe4881918c0524c389babc60";
 
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY not configured');
