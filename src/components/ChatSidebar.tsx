@@ -67,7 +67,7 @@ export const ChatSidebar = () => {
       <div className="p-4 border-t border-border">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center">
-            <span className="text-accent-foreground font-bold text-sm">SW</span>
+            <span className="text-accent-foreground font-bold text-sm">PT</span>
           </div>
           <span className="font-medium text-foreground text-sm">
             POOL techniek
