@@ -11,7 +11,7 @@ interface Colleague {
 }
 
 const colleagues: Colleague[] = [
-  { id: "1", name: "Collin", role: "Calculator", messageCount: 3 },
+  { id: "1", name: "Engineer", role: "Calculator", messageCount: 3 },
   { id: "2", name: "Henk", role: "Uitvoerder", messageCount: 5 },
   { id: "3", name: "Monique", role: "Marketing", messageCount: 16 },
 ];
