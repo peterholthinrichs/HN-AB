@@ -153,6 +153,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         assistant_id: ASSISTANT_ID,
+        additional_instructions: "Belangrijk: Geef je antwoord ALTIJD in het Nederlands, ongeacht de taal waarin de vraag wordt gesteld.",
         tool_resources: {
           file_search: {
             vector_store_ids: [VECTOR_STORE_ID]
