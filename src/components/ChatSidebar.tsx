@@ -22,14 +22,18 @@ const colleagues: Colleague[] = [
 interface ChatSidebarProps {
   selectedColleague: string | null;
   onSelectColleague: (id: string) => void;
+  onNewChat?: () => void;
 }
 
-export const ChatSidebar = ({ selectedColleague, onSelectColleague }: ChatSidebarProps) => {
+export const ChatSidebar = ({ selectedColleague, onSelectColleague, onNewChat }: ChatSidebarProps) => {
   return (
     <aside className="w-[var(--sidebar-width)] h-screen bg-secondary border-r border-border flex flex-col">
       {/* New Chat Button */}
       <div className="p-4">
-        <Button className="w-full justify-start gap-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
+        <Button 
+          onClick={onNewChat}
+          className="w-full justify-start gap-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+        >
           <div className="w-6 h-6 rounded-full bg-primary-foreground/20 flex items-center justify-center">
             <Plus className="w-4 h-4" />
           </div>

@@ -16,7 +16,11 @@ interface Message {
   citations?: Array<{ file_id: string; filename?: string; quote?: string }>;
 }
 
-export const ChatWelcome = () => {
+interface ChatWelcomeProps {
+  onNewChat?: () => void;
+}
+
+export const ChatWelcome = ({ onNewChat }: ChatWelcomeProps = {}) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,6 +28,23 @@ export const ChatWelcome = () => {
   const [runStatus, setRunStatus] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const resetChat = () => {
+    setMessages([]);
+    setThreadId(null);
+    setMessage("");
+    setRunStatus("");
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    if (onNewChat) {
+      // Expose resetChat via a callback pattern
+      const handler = () => resetChat();
+      // Store the handler reference if needed
+      (window as any).__resetChat = handler;
+    }
+  }, [onNewChat]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
