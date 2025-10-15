@@ -5,7 +5,7 @@ import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
 
 const suggestions = [
-  "Zoek in het prijzenboek het meest passende onderdeel bij de omschrijving van het werk.",
+  "Welke sensoren (Shr2, Shr3, Shr4, Shr8) zijn verplicht voor een veilige werking van de warmteterugwinning, en waar worden ze geplaatst?",
   "Maak een berekening voor meerdere onderhoudsscenario's",
   "Bereken de Total Cost of Ownership voor een onderhoudsmaatregel.",
 ];
