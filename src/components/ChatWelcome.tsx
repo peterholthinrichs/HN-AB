@@ -13,7 +13,7 @@ const suggestions = [
 interface Message {
   role: 'user' | 'assistant';
   content: string;
-  citations?: Array<{ file_id: string; quote?: string }>;
+  citations?: Array<{ file_id: string; filename?: string; quote?: string }>;
 }
 
 export const ChatWelcome = () => {
@@ -33,7 +33,7 @@ export const ChatWelcome = () => {
     scrollToBottom();
   }, [messages]);
 
-  const pollRunStatus = async (threadId: string, runId: string): Promise<{ text: string; citations?: Array<{ file_id: string; quote?: string }> }> => {
+  const pollRunStatus = async (threadId: string, runId: string): Promise<{ text: string; citations?: Array<{ file_id: string; filename?: string; quote?: string }> }> => {
     const maxAttempts = 60; // 60 seconds max
     let attempts = 0;
 
@@ -219,7 +219,7 @@ export const ChatWelcome = () => {
                         <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
                         {msg.citations.map((citation, idx) => (
                           <div key={idx} className="text-xs text-muted-foreground mb-2">
-                            <span className="font-medium">• Bron {idx + 1}</span>
+                            <span className="font-medium">• {citation.filename || `Bron ${idx + 1}`}</span>
                             {citation.quote && (
                               <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>
                             )}

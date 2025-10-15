@@ -69,10 +69,31 @@ serve(async (req) => {
           }
         }
 
+        // Fetch file metadata for each citation to get filenames
+        const citationsWithFilenames = await Promise.all(
+          citations.map(async (citation) => {
+            try {
+              const fileResponse = await fetch(`https://api.openai.com/v1/files/${citation.file_id}`, {
+                headers: {
+                  'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                }
+              });
+              const fileData = await fileResponse.json();
+              return {
+                ...citation,
+                filename: fileData.filename || citation.file_id
+              };
+            } catch (error) {
+              console.error('Error fetching file metadata:', error);
+              return { ...citation, filename: citation.file_id };
+            }
+          })
+        );
+
         return new Response(JSON.stringify({ 
           status: 'completed', 
           text,
-          citations
+          citations: citationsWithFilenames
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
