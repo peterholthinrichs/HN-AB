@@ -21,6 +21,7 @@ export const ChatWelcome = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const [runStatus, setRunStatus] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -37,7 +38,7 @@ export const ChatWelcome = () => {
     let attempts = 0;
 
     while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      await new Promise(resolve => setTimeout(resolve, 300)); // Wait 300ms for faster updates
       
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
         method: 'POST',
@@ -51,9 +52,14 @@ export const ChatWelcome = () => {
       const data = await response.json();
       console.log('Poll result:', data);
 
+      // Update run status for UI feedback
+      setRunStatus(data.status || '');
+
       if (data.status === 'completed') {
+        setRunStatus('');
         return { text: data.text, citations: data.citations };
       } else if (data.status === 'failed' || data.status === 'cancelled' || data.status === 'expired') {
+        setRunStatus('');
         throw new Error(data.error || 'Run failed');
       }
 
@@ -223,7 +229,15 @@ export const ChatWelcome = () => {
                     )}
                   </>
                 ) : (
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">
+                      {runStatus === 'requires_action' ? 'Zoeken in documenten...' : 
+                       runStatus === 'in_progress' ? 'Aan het nadenken...' : 
+                       runStatus === 'queued' ? 'In de wachtrij...' :
+                       'Bezig...'}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
