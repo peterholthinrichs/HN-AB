@@ -2,6 +2,7 @@ import { Plus, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import engineerAvatar from "@/assets/engineer-avatar.png";
+import henkAvatar from "@/assets/henk-avatar.png";
 
 interface Colleague {
   id: string;
@@ -13,7 +14,7 @@ interface Colleague {
 
 const colleagues: Colleague[] = [
   { id: "1", name: "Engineer", role: "Calculator", messageCount: 3, avatar: engineerAvatar },
-  { id: "2", name: "Henk", role: "Uitvoerder", messageCount: 5 },
+  { id: "2", name: "Henk", role: "Uitvoerder", messageCount: 5, avatar: henkAvatar },
   { id: "3", name: "Monique", role: "Marketing", messageCount: 16 },
 ];
 
