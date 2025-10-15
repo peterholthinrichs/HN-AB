@@ -1,6 +1,6 @@
+import React, { useState, useRef, useEffect } from "react";
 import { MessageSquare, ArrowUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useRef, useEffect } from "react";
 import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
 
