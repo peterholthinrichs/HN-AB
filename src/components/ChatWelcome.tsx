@@ -3,6 +3,7 @@ import { MessageSquare, ArrowUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
+import { Message, ChatSession } from "@/types/chat";
 
 const suggestions = [
   "Welke sensoren (Shr2, Shr3, Shr4, Shr8) zijn verplicht voor een veilige werking van de warmteterugwinning, en waar worden ze geplaatst?",
@@ -10,41 +11,37 @@ const suggestions = [
   "Hoe werkt de RTK ELECTRISCHE AANDRIJVING RE-ACT 30E/DC?",
 ];
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  citations?: Array<{ file_id: string; filename?: string; quote?: string }>;
-}
-
 interface ChatWelcomeProps {
-  onNewChat?: () => void;
+  currentSession: ChatSession | null;
+  onSessionUpdate: (messages: Message[], threadId: string | null) => void;
 }
 
-export const ChatWelcome = ({ onNewChat }: ChatWelcomeProps = {}) => {
+export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProps) => {
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(currentSession?.messages || []);
   const [isLoading, setIsLoading] = useState(false);
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(currentSession?.threadId || null);
   const [runStatus, setRunStatus] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const resetChat = () => {
-    setMessages([]);
-    setThreadId(null);
-    setMessage("");
-    setRunStatus("");
-    setIsLoading(false);
-  };
-
+  // Update session when messages or threadId change
   useEffect(() => {
-    if (onNewChat) {
-      // Expose resetChat via a callback pattern
-      const handler = () => resetChat();
-      // Store the handler reference if needed
-      (window as any).__resetChat = handler;
+    if (messages.length > 0 || threadId) {
+      onSessionUpdate(messages, threadId);
     }
-  }, [onNewChat]);
+  }, [messages, threadId]);
+
+  // Load session when currentSession changes
+  useEffect(() => {
+    if (currentSession) {
+      setMessages(currentSession.messages);
+      setThreadId(currentSession.threadId);
+      setMessage("");
+      setRunStatus("");
+      setIsLoading(false);
+    }
+  }, [currentSession?.id]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
