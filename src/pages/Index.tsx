@@ -9,6 +9,7 @@ const Index = () => {
   const [selectedColleague, setSelectedColleague] = useState<string | null>("1");
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Load sessions from localStorage on mount
   useEffect(() => {
@@ -22,6 +23,22 @@ const Index = () => {
         console.error("Failed to load chat sessions:", error);
       }
     }
+    
+    // If no active chat after loading, create initial empty session
+    if (!stored || !localStorage.getItem(STORAGE_KEY)) {
+      const initialSession: ChatSession = {
+        id: `chat-${Date.now()}`,
+        title: "Nieuwe chat",
+        messages: [],
+        threadId: null,
+        createdAt: Date.now(),
+        lastMessageAt: Date.now(),
+      };
+      setChatSessions([initialSession]);
+      setActiveChatId(initialSession.id);
+    }
+    
+    setIsInitialized(true);
   }, []);
 
   // Save sessions to localStorage whenever they change
@@ -38,10 +55,18 @@ const Index = () => {
   }, [chatSessions, activeChatId]);
 
   const handleNewChat = () => {
-    // Save current chat if it has messages
-    const currentSession = chatSessions.find((s) => s.id === activeChatId);
-    if (currentSession && currentSession.messages.length > 0) {
-      // Current chat already saved, just create new one
+    // Get the current session (might have unsaved messages)
+    const currentSessionData = chatSessions.find((s) => s.id === activeChatId);
+    
+    // If current session exists and has messages, ensure it's saved
+    if (currentSessionData && currentSessionData.messages.length > 0) {
+      // Session is already in chatSessions, it will be automatically saved via useEffect
+      // No action needed here
+    } else if (activeChatId) {
+      // There might be an active chat ID but no session saved yet
+      // This happens when the first message is sent but session hasn't been created yet
+      // The handleSessionUpdate will handle this, so we just need to make sure
+      // we're not creating a duplicate
     }
 
     // Create new chat session
