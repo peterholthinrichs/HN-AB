@@ -75,7 +75,6 @@ serve(async (req) => {
 
     console.log('Message added successfully');
 
-    // Create run with streaming
     console.log('Creating run with streaming...');
     const runResponse = await fetch(`https://api.openai.com/v1/threads/${currentThreadId}/runs`, {
       method: 'POST',
@@ -96,13 +95,26 @@ serve(async (req) => {
       throw new Error(`Failed to create run: ${error}`);
     }
 
-    console.log('Streaming response started');
+    console.log('Streaming response started, content-type:', runResponse.headers.get('content-type'));
+    
+    // Log a sample of the stream to debug
+    const responseClone = runResponse.clone();
+    const reader = responseClone.body?.getReader();
+    if (reader) {
+      const { value } = await reader.read();
+      if (value) {
+        const sample = new TextDecoder().decode(value).substring(0, 500);
+        console.log('Stream sample:', sample);
+      }
+    }
 
     // Return the streaming response
     return new Response(runResponse.body, {
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
         'X-Thread-Id': currentThreadId
       }
     });

@@ -53,8 +53,13 @@ export const ChatWelcome = () => {
         })
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
       }
 
       // Get thread ID from response headers
@@ -68,6 +73,7 @@ export const ChatWelcome = () => {
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let assistantMessage = '';
+      let buffer = '';
 
       if (reader) {
         setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
@@ -76,37 +82,60 @@ export const ChatWelcome = () => {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') continue;
+            if (!line.trim() || line.startsWith(':')) continue;
+            
+            if (line.startsWith('event: ') || line.startsWith('data: ')) {
+              const eventMatch = line.match(/^event: (.+)$/);
+              const dataMatch = line.match(/^data: (.+)$/);
+              
+              if (dataMatch) {
+                const data = dataMatch[1];
+                if (data === '[DONE]') continue;
 
-              try {
-                const parsed = JSON.parse(data);
-                
-                // Handle text deltas
-                if (parsed.event === 'thread.message.delta') {
-                  const content = parsed.data?.delta?.content?.[0];
-                  if (content?.type === 'text' && content?.text?.value) {
-                    assistantMessage += content.text.value;
-                    setMessages(prev => {
-                      const newMessages = [...prev];
-                      newMessages[newMessages.length - 1] = {
-                        role: 'assistant',
-                        content: assistantMessage
-                      };
-                      return newMessages;
-                    });
+                try {
+                  const parsed = JSON.parse(data);
+                  console.log('Parsed event:', parsed);
+                  
+                  // Handle text deltas from OpenAI Assistants API
+                  if (parsed.event === 'thread.message.delta') {
+                    const deltaContent = parsed.data?.delta?.content;
+                    if (deltaContent && Array.isArray(deltaContent)) {
+                      for (const content of deltaContent) {
+                        if (content?.type === 'text' && content?.text?.value) {
+                          assistantMessage += content.text.value;
+                          setMessages(prev => {
+                            const newMessages = [...prev];
+                            newMessages[newMessages.length - 1] = {
+                              role: 'assistant',
+                              content: assistantMessage
+                            };
+                            return newMessages;
+                          });
+                        }
+                      }
+                    }
                   }
+                  
+                  // Also handle text created events
+                  if (parsed.event === 'thread.message.created') {
+                    console.log('Message created event received');
+                  }
+                } catch (e) {
+                  console.error('Error parsing SSE data:', e, 'Line:', data);
                 }
-              } catch (e) {
-                console.error('Error parsing SSE data:', e);
               }
             }
           }
+        }
+        
+        // Process any remaining buffer
+        if (buffer.trim()) {
+          console.log('Remaining buffer:', buffer);
         }
       }
 
