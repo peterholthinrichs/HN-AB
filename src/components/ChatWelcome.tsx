@@ -237,9 +237,12 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
                       <div className="mt-4 pt-4 border-t border-border/40">
                         <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
                         {msg.citations.map((citation, idx) => {
-                          // Convert .txt extension to .pdf for document links
+                          // Convert .txt extension to .pdf for document links and normalize filename
                           const filename = citation.filename || `Bron ${idx + 1}`;
-                          const pdfFilename = filename.replace(/\.txt$/, '.pdf');
+                          const pdfFilename = filename
+                            .replace(/\.txt$/i, '.pdf')
+                            .trim()
+                            .replace(/\s+/g, '_');
                           
                           // Use local URL as primary fallback (works immediately)
                           // Falls back to storage URL if local file is not available
