@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MessageSquare, ArrowUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/avatar.png";
+import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
 
 const suggestions = [
@@ -131,8 +131,8 @@ export const ChatWelcome = () => {
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-4xl mx-auto w-full">
-        <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center mb-6 overflow-hidden">
-          <img src={logo} alt="POOL techniek logo" className="w-full h-full object-cover" />
+        <div className="w-16 h-16 flex items-center justify-center mb-6">
+          <img src={logo} alt="POOL techniek logo" className="w-full h-full object-contain" />
         </div>
 
         <h1 className="text-3xl font-semibold text-foreground mb-12">
@@ -194,8 +194,8 @@ export const ChatWelcome = () => {
               className={`flex gap-4 mb-6 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  <img src={logo} alt="AI" className="w-full h-full object-cover" />
+                <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                  <img src={logo} alt="AI" className="w-full h-full object-contain" />
                 </div>
               )}
               <div
