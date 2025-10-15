@@ -215,7 +215,16 @@ export const ChatWelcome = () => {
                         <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
                         {msg.citations.map((citation, idx) => (
                           <div key={idx} className="text-xs text-muted-foreground mb-2">
-                            <span className="font-medium">• {citation.filename || `Bron ${idx + 1}`}</span>
+                            <span className="font-medium">
+                              • <a 
+                                  href="https://drive.google.com/drive/folders/1eZMAAU_wOE3vZ67KPCr8MFRScbjz3zcf" 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="hover:underline hover:text-foreground transition-colors"
+                                >
+                                  {citation.filename || `Bron ${idx + 1}`}
+                                </a>
+                            </span>
                             {citation.quote && <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>}
                           </div>
                         ))}
