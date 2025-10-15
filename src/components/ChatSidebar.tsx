@@ -10,16 +10,21 @@ interface Colleague {
   name: string;
   role: string;
   avatar?: string;
-  messageCount: number;
+  messageCount?: number;
 }
 
 const colleagues: Colleague[] = [
   { id: "1", name: "Engineer", role: "Calculator", messageCount: 3, avatar: engineerAvatar },
-  { id: "2", name: "Marketing", role: "LOCKED", messageCount: 5, avatar: henkAvatar },
-  { id: "3", name: "HR", role: "LOCKED", messageCount: 16, avatar: hrAvatar },
+  { id: "2", name: "Marketing", role: "LOCKED", avatar: henkAvatar },
+  { id: "3", name: "HR", role: "LOCKED", avatar: hrAvatar },
 ];
 
-export const ChatSidebar = () => {
+interface ChatSidebarProps {
+  selectedColleague: string | null;
+  onSelectColleague: (id: string) => void;
+}
+
+export const ChatSidebar = ({ selectedColleague, onSelectColleague }: ChatSidebarProps) => {
   return (
     <aside className="w-[var(--sidebar-width)] h-screen bg-secondary border-r border-border flex flex-col">
       {/* New Chat Button */}
@@ -36,33 +41,50 @@ export const ChatSidebar = () => {
       <div className="flex-1 px-4 overflow-y-auto">
         <h3 className="text-sm font-medium text-foreground mb-3">Collega's</h3>
         <div className="space-y-1">
-          {colleagues.map((colleague) => (
-            <button
-              key={colleague.id}
-              className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors text-left"
-            >
-              <Avatar className="w-10 h-10">
-                <AvatarImage src={colleague.avatar} />
-                <AvatarFallback className="bg-muted text-foreground">
-                  {colleague.name[0]}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-foreground text-sm">
-                    {colleague.name}
-                  </span>
-                  <span className="text-muted-foreground text-sm">·</span>
-                  <span className="text-muted-foreground text-sm">
-                    {colleague.role}
-                  </span>
+          {colleagues.map((colleague) => {
+            const isSelected = selectedColleague === colleague.id;
+            const isLocked = colleague.role === "LOCKED";
+            
+            return (
+              <button
+                key={colleague.id}
+                onClick={() => !isLocked && onSelectColleague(colleague.id)}
+                disabled={isLocked}
+                className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left ${
+                  isSelected 
+                    ? "border-2 border-primary bg-primary/5" 
+                    : "border-2 border-transparent"
+                } ${
+                  isLocked 
+                    ? "opacity-60 cursor-not-allowed" 
+                    : "hover:bg-muted/50 cursor-pointer"
+                }`}
+              >
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src={colleague.avatar} />
+                  <AvatarFallback className="bg-muted text-foreground">
+                    {colleague.name[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground text-sm">
+                      {colleague.name}
+                    </span>
+                    <span className="text-muted-foreground text-sm">·</span>
+                    <span className="text-muted-foreground text-sm">
+                      {colleague.role}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <span className="text-sm font-medium text-muted-foreground">
-                {colleague.messageCount}
-              </span>
-            </button>
-          ))}
+                {colleague.messageCount !== undefined && (
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {colleague.messageCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
