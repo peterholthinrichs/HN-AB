@@ -31,6 +31,37 @@ export const ChatWelcome = () => {
     scrollToBottom();
   }, [messages]);
 
+  const pollRunStatus = async (threadId: string, runId: string): Promise<string> => {
+    const maxAttempts = 60; // 60 seconds max
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+        },
+        body: JSON.stringify({ threadId, runId })
+      });
+
+      const data = await response.json();
+      console.log('Poll result:', data);
+
+      if (data.status === 'completed') {
+        return data.text;
+      } else if (data.status === 'failed' || data.status === 'cancelled' || data.status === 'expired') {
+        throw new Error(data.error || 'Run failed');
+      }
+
+      attempts++;
+    }
+
+    throw new Error('Timeout waiting for response');
+  };
+
   const handleSend = async () => {
     if (!message.trim() || isLoading) return;
 
@@ -40,7 +71,9 @@ export const ChatWelcome = () => {
     setIsLoading(true);
 
     try {
-      console.log('Sending message to edge function...');
+      console.log('Sending message...');
+      
+      // Create run
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
         method: 'POST',
         headers: {
@@ -53,123 +86,40 @@ export const ChatWelcome = () => {
         })
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Get thread ID from response headers
-      const newThreadId = response.headers.get('X-Thread-Id');
-      if (newThreadId && !threadId) {
-        console.log('Thread ID received:', newThreadId);
-        setThreadId(newThreadId);
+      const data = await response.json();
+      console.log('Run created:', data);
+
+      if (data.threadId && !threadId) {
+        setThreadId(data.threadId);
       }
 
-      // Process streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let assistantMessage = '';
-      let buffer = '';
+      // Add empty assistant message
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
-      if (reader) {
-        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      // Poll for completion
+      const assistantText = await pollRunStatus(data.threadId, data.runId);
+      
+      // Update assistant message
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          role: 'assistant',
+          content: assistantText
+        };
+        return newMessages;
+      });
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-          for (const line of lines) {
-            if (!line.trim() || line.startsWith(':')) continue;
-            
-            if (line.startsWith('event: ') || line.startsWith('data: ')) {
-              const eventMatch = line.match(/^event: (.+)$/);
-              const dataMatch = line.match(/^data: (.+)$/);
-              
-              if (dataMatch) {
-                const data = dataMatch[1];
-                if (data === '[DONE]') continue;
-
-                try {
-                  const parsed = JSON.parse(data);
-                  console.log('Parsed event:', parsed);
-                  
-                  // Handle text deltas from OpenAI Assistants API
-                  if (parsed.event === 'thread.message.delta') {
-                    const deltaContent = parsed.data?.delta?.content;
-                    if (deltaContent && Array.isArray(deltaContent)) {
-                      for (const content of deltaContent) {
-                        if (content?.type === 'text' && content?.text?.value) {
-                          assistantMessage += content.text.value;
-                          setMessages(prev => {
-                            const newMessages = [...prev];
-                            newMessages[newMessages.length - 1] = {
-                              role: 'assistant',
-                              content: assistantMessage
-                            };
-                            return newMessages;
-                          });
-                        }
-                      }
-                    }
-                  }
-                  
-                  // Also handle text created events
-                  if (parsed.event === 'thread.message.created') {
-                    console.log('Message created event received');
-                  }
-                } catch (e) {
-                  console.error('Error parsing SSE data:', e, 'Line:', data);
-                }
-              }
-            }
-          }
-        }
-        
-        // Process any remaining buffer
-        if (buffer.trim()) {
-          console.log('Remaining buffer:', buffer);
-        }
-      }
-
-      // Fallback: if no streamed text, fetch the latest assistant message
-      const tid = (response.headers.get('X-Thread-Id')) || threadId;
-      if (!assistantMessage.trim() && tid) {
-        console.log('No streamed text, fetching latest assistant message...');
-        const fallbackRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
-          },
-          body: JSON.stringify({ getMessages: true, threadId: tid })
-        });
-        const { text } = await fallbackRes.json();
-        if (text) {
-          setMessages(prev => {
-            const newMessages = [...prev];
-            newMessages[newMessages.length - 1] = { role: 'assistant', content: text };
-            return newMessages;
-          });
-        }
-      }
-
-      console.log('Message processing complete');
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error:', error);
       toast({
         title: "Fout",
-        description: error instanceof Error ? error.message : "Er is een fout opgetreden bij het verzenden van het bericht",
+        description: error instanceof Error ? error.message : "Er is een fout opgetreden",
         variant: "destructive"
       });
-      // Remove the last assistant message if there was an error
       setMessages(prev => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
@@ -179,17 +129,14 @@ export const ChatWelcome = () => {
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-4xl mx-auto w-full">
-        {/* Welcome Icon */}
         <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center mb-6 overflow-hidden">
           <img src={logo} alt="POOL techniek logo" className="w-full h-full object-cover" />
         </div>
 
-        {/* Welcome Text */}
         <h1 className="text-3xl font-semibold text-foreground mb-12">
           Waar kan ik je mee helpen?
         </h1>
 
-        {/* Message Input */}
         <div className="w-full max-w-2xl mb-8">
           <div className="relative">
             <input
@@ -216,7 +163,6 @@ export const ChatWelcome = () => {
           </div>
         </div>
 
-        {/* Suggestions */}
         <div className="w-full max-w-2xl space-y-3">
           {suggestions.map((suggestion, index) => (
             <button
@@ -238,7 +184,6 @@ export const ChatWelcome = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-8 space-y-6">
         <div className="max-w-4xl mx-auto">
           {messages.map((msg, index) => (
@@ -258,25 +203,18 @@ export const ChatWelcome = () => {
                     : 'bg-card border border-border text-foreground'
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                {msg.content ? (
+                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                ) : (
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                )}
               </div>
             </div>
           ))}
-          {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-            <div className="flex gap-4 mb-6">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 overflow-hidden">
-                <img src={logo} alt="AI" className="w-full h-full object-cover" />
-              </div>
-              <div className="max-w-[70%] p-4 rounded-2xl bg-card border border-border">
-                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-              </div>
-            </div>
-          )}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Input Area */}
       <div className="border-t border-border p-4 bg-background">
         <div className="max-w-4xl mx-auto">
           <div className="relative">

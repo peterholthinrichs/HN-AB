@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, threadId, getMessages } = await req.json();
+    const { message, threadId, runId } = await req.json();
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const ASSISTANT_ID = "asst_u9SBVjdEmMgEyJtXkiOSkZMD";
     const VECTOR_STORE_ID = "vs_68c81b73bdbc81919aeb78d8fc10c87e";
@@ -21,28 +21,63 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
-    // Fallback: return latest assistant message for a thread
-    if (getMessages && threadId) {
-      const msgsRes = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages?limit=10`, {
+    // Check run status if runId provided
+    if (runId && threadId) {
+      console.log('Checking run status:', runId);
+      const statusResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${runId}`, {
         headers: {
           'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
           'OpenAI-Beta': 'assistants=v2'
         }
       });
-      const msgs = await msgsRes.json();
-      const firstAssistant = (msgs.data || []).find((m: any) => m.role === 'assistant');
-      let text = '';
-      if (firstAssistant?.content) {
-        for (const c of firstAssistant.content) {
-          if (c.type === 'text' && c.text?.value) text += c.text.value;
-        }
-      }
-      return new Response(JSON.stringify({ text }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
 
-    console.log('Processing message:', message);
-    console.log('Thread ID:', threadId);
+      const runStatus = await statusResponse.json();
+      console.log('Run status:', runStatus.status);
+
+      if (runStatus.status === 'completed') {
+        // Fetch messages
+        const messagesResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages?limit=1&order=desc`, {
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            'OpenAI-Beta': 'assistants=v2'
+          }
+        });
+
+        const messagesData = await messagesResponse.json();
+        const lastMessage = messagesData.data[0];
+        
+        let text = '';
+        if (lastMessage?.role === 'assistant' && lastMessage.content) {
+          for (const content of lastMessage.content) {
+            if (content.type === 'text' && content.text?.value) {
+              text += content.text.value;
+            }
+          }
+        }
+
+        return new Response(JSON.stringify({ 
+          status: 'completed', 
+          text 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } else if (runStatus.status === 'failed' || runStatus.status === 'cancelled' || runStatus.status === 'expired') {
+        return new Response(JSON.stringify({ 
+          status: runStatus.status,
+          error: runStatus.last_error?.message || 'Run failed'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } else {
+        // Still in progress
+        return new Response(JSON.stringify({ 
+          status: runStatus.status 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
 
     // Create or use existing thread
     let currentThreadId = threadId;
@@ -55,11 +90,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
           'OpenAI-Beta': 'assistants=v2'
         },
-        body: JSON.stringify({
-          metadata: {
-            vector_store_id: "vs_68c81b73bdbc81919aeb78d8fc10c87e"
-          }
-        })
+        body: JSON.stringify({})
       });
 
       if (!threadResponse.ok) {
@@ -96,7 +127,8 @@ serve(async (req) => {
 
     console.log('Message added successfully');
 
-    console.log('Creating run with streaming...');
+    // Create run
+    console.log('Creating run...');
     const runResponse = await fetch(`https://api.openai.com/v1/threads/${currentThreadId}/runs`, {
       method: 'POST',
       headers: {
@@ -106,7 +138,6 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         assistant_id: ASSISTANT_ID,
-        stream: true,
         tool_resources: {
           file_search: {
             vector_store_ids: [VECTOR_STORE_ID]
@@ -121,28 +152,15 @@ serve(async (req) => {
       throw new Error(`Failed to create run: ${error}`);
     }
 
-    console.log('Streaming response started, content-type:', runResponse.headers.get('content-type'));
-    
-    // Log a sample of the stream to debug
-    const responseClone = runResponse.clone();
-    const reader = responseClone.body?.getReader();
-    if (reader) {
-      const { value } = await reader.read();
-      if (value) {
-        const sample = new TextDecoder().decode(value).substring(0, 500);
-        console.log('Stream sample:', sample);
-      }
-    }
+    const runData = await runResponse.json();
+    console.log('Run created:', runData.id);
 
-    // Return the streaming response
-    return new Response(runResponse.body, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'X-Thread-Id': currentThreadId
-      }
+    return new Response(JSON.stringify({
+      threadId: currentThreadId,
+      runId: runData.id,
+      status: 'in_progress'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
