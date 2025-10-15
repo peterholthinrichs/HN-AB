@@ -217,7 +217,14 @@ export const ChatWelcome = () => {
                           // Convert .txt extension to .pdf for document links
                           const filename = citation.filename || `Bron ${idx + 1}`;
                           const pdfFilename = filename.replace(/\.txt$/, '.pdf');
-                          const documentUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/documents/${pdfFilename}`;
+                          
+                          // Use local URL as primary fallback (works immediately)
+                          // Falls back to storage URL if local file is not available
+                          const localUrl = `/documents/${pdfFilename}`;
+                          const storageUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/documents/${pdfFilename}`;
+                          
+                          // Try local first, storage as backup
+                          const documentUrl = localUrl;
                           
                           return (
                             <div key={idx} className="text-xs text-muted-foreground mb-2">
@@ -227,6 +234,10 @@ export const ChatWelcome = () => {
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     className="hover:underline hover:text-foreground transition-colors"
+                                    onError={(e) => {
+                                      // Fallback to storage URL if local fails
+                                      e.currentTarget.href = storageUrl;
+                                    }}
                                   >
                                     {filename}
                                   </a>

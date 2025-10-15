@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChatSidebar } from "@/components/ChatSidebar";
 import { ChatWelcome } from "@/components/ChatWelcome";
+import { DocumentUploadHelper } from "@/components/DocumentUploadHelper";
 
 const Index = () => {
   const [selectedColleague, setSelectedColleague] = useState<string | null>("1");
@@ -12,6 +13,7 @@ const Index = () => {
         onSelectColleague={setSelectedColleague}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
+        <DocumentUploadHelper />
         <ChatWelcome />
       </main>
     </div>
