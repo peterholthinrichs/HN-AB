@@ -14,8 +14,8 @@ interface Colleague {
 
 const colleagues: Colleague[] = [
   { id: "1", name: "Engineer", role: "Calculator", messageCount: 3, avatar: engineerAvatar },
-  { id: "2", name: "Henk", role: "Uitvoerder", messageCount: 5, avatar: henkAvatar },
-  { id: "3", name: "Monique", role: "Marketing", messageCount: 16 },
+  { id: "2", name: "Marketing", role: "LOCKED", messageCount: 5, avatar: henkAvatar },
+  { id: "3", name: "HR", role: "LOCKED", messageCount: 16 },
 ];
 
 export const ChatSidebar = () => {
