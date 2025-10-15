@@ -70,7 +70,7 @@ export const ChatSidebar = () => {
             <span className="text-accent-foreground font-bold text-sm">SW</span>
           </div>
           <span className="font-medium text-foreground text-sm">
-            SW Vastgoedverbetering
+            POOL techniek
           </span>
           <Button variant="ghost" size="icon" className="ml-auto">
             <MoreVertical className="w-4 h-4" />

@@ -1,6 +1,7 @@
 import { MessageSquare, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import logo from "@/assets/logo.png";
 
 const suggestions = [
   "Zoek in het prijzenboek het meest passende onderdeel bij de omschrijving van het werk.",
@@ -21,8 +22,8 @@ export const ChatWelcome = () => {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-4xl mx-auto w-full">
       {/* Welcome Icon */}
-      <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center mb-6">
-        <span className="text-3xl">😊</span>
+      <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center mb-6 overflow-hidden">
+        <img src={logo} alt="POOL techniek logo" className="w-full h-full object-cover" />
       </div>
 
       {/* Welcome Text */}
