@@ -69,6 +69,13 @@ serve(async (req) => {
           }
         }
 
+        // Verwijder OpenAI annotation markers en bronvermeldingen uit de tekst
+        text = text.replace(/【[^】]*】/g, ''); // Verwijder 【source:X】 markers
+        text = text.replace(/Bron:\s*[^\n]+\.txt/gi, ''); // Verwijder "Bron: filename.txt" regels
+        text = text.replace(/Bron:\s*[^\n]+/gi, ''); // Verwijder andere "Bron: ..." regels
+        text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); // Cleanup extra lege regels
+        text = text.trim();
+
         // Fetch file metadata for each citation to get filenames
         const citationsWithFilenames = await Promise.all(
           citations.map(async (citation) => {
