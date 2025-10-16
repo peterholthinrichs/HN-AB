@@ -5,6 +5,8 @@ import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
 import { Message, ChatSession } from "@/types/chat";
 import { PdfPreviewDialog } from "@/components/PdfPreviewDialog";
+import { getAuthToken } from "@/lib/auth";
+import DOMPurify from 'dompurify';
 
 const suggestions = [
   "Welke sensoren (Shr2, Shr3, Shr4, Shr8) zijn verplicht voor een veilige werking van de warmteterugwinning, en waar worden ze geplaatst?",
@@ -57,11 +59,17 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
   }, [messages]);
 
   const streamResponse = async (userMessage: string): Promise<void> => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error('Niet geauthenticeerd');
+    }
+
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        Authorization: `Bearer ${token}`,
+        "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       },
       body: JSON.stringify({
         message: userMessage,
@@ -134,11 +142,23 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
   };
 
   const handleSend = async () => {
-    if (!message.trim() || isLoading) return;
+    const trimmedMessage = message.trim();
+    
+    if (!trimmedMessage || isLoading) return;
+    
+    // Validate message length
+    const MAX_MESSAGE_LENGTH = 2000;
+    if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+      toast({
+        title: "Bericht te lang",
+        description: `Maximum ${MAX_MESSAGE_LENGTH} tekens toegestaan`,
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const userMessage = message.trim();
     setMessage("");
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setMessages((prev) => [...prev, { role: "user", content: trimmedMessage }]);
     setIsLoading(true);
 
     // Add empty assistant message for streaming
@@ -146,7 +166,7 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
 
     try {
       console.log("Streaming message...");
-      await streamResponse(userMessage);
+      await streamResponse(trimmedMessage);
     } catch (error) {
       console.error("Error:", error);
       toast({
@@ -229,12 +249,15 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
               >
                 {msg.content ? (
                   <>
-                    <div
-                      className="text-sm whitespace-pre-wrap"
-                      dangerouslySetInnerHTML={{
-                        __html: msg.content.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"),
-                      }}
-                    />
+                  <div
+                    className="text-sm whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(
+                        msg.content.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"),
+                        { ALLOWED_TAGS: ['strong', 'em', 'br', 'p', 'ul', 'ol', 'li'] }
+                      ),
+                    }}
+                  />
                     {msg.role === "assistant" && msg.citations && msg.citations.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-border/40">
                         <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>

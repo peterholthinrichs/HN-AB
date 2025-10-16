@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import logo from "@/assets/logo.png";
 
-export const Login = () => {
+const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -138,3 +138,5 @@ export const Login = () => {
     </div>
   );
 };
+
+export default Login;

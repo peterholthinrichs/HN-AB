@@ -1,11 +1,32 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+async function verifyJWT(token: string, secret: string): Promise<boolean> {
+  try {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secret);
+    const key = await crypto.subtle.importKey(
+      "raw",
+      keyData,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign", "verify"]
+    );
+
+    await verify(token, key);
+    return true;
+  } catch (error) {
+    console.error("JWT verification failed");
+    return false;
+  }
+}
 
 // Simple hash function for question caching
 function hashQuestion(question: string): string {
@@ -18,13 +39,62 @@ serve(async (req) => {
   }
 
   try {
+    // Verify JWT token
+    const jwtSecret = Deno.env.get('JWT_SECRET');
+    if (!jwtSecret) {
+      console.error('JWT_SECRET not configured');
+      return new Response(
+        JSON.stringify({ error: 'Service temporarily unavailable' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Niet geauthenticeerd' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.substring(7);
+    const isValid = await verifyJWT(token, jwtSecret);
+    
+    if (!isValid) {
+      return new Response(
+        JSON.stringify({ error: 'Ongeldige authenticatie' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { message, threadId } = await req.json();
+    
+    // Validate message
+    if (!message || typeof message !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'Ongeldig berichtformaat' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const trimmedMessage = message.trim();
+    
+    if (trimmedMessage.length === 0 || trimmedMessage.length > 2000) {
+      return new Response(
+        JSON.stringify({ error: 'Bericht moet tussen 1 en 2000 tekens bevatten' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const ASSISTANT_ID = "asst_u9SBVjdEmMgEyJtXkiOSkZMD";
     const VECTOR_STORE_ID = "vs_68ef575ffe4881918c0524c389babc60";
 
     if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY not configured');
+      console.error('OPENAI_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ error: 'Service temporarily unavailable' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Initialize Supabase client for caching
@@ -34,7 +104,7 @@ serve(async (req) => {
     );
 
     // Check cache first
-    const questionHash = hashQuestion(message);
+    const questionHash = hashQuestion(trimmedMessage);
     console.log('Checking cache for question hash:', questionHash);
     
     const { data: cachedResponse } = await supabase
@@ -127,7 +197,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         role: 'user',
-        content: message
+        content: trimmedMessage
       })
     });
 
@@ -270,11 +340,11 @@ serve(async (req) => {
                       })
                     );
 
-                    // Cache the response
+                     // Cache the response
                     console.log('Caching response...');
                     await supabase.from('chat_responses').insert({
                       question_hash: questionHash,
-                      question: message,
+                      question: trimmedMessage,
                       answer: fullText,
                       citations: citationsWithFilenames
                     });
@@ -308,7 +378,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in openai-chat function:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ error: 'Er is een fout opgetreden' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
