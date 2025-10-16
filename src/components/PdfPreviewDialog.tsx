@@ -22,8 +22,8 @@ export function PdfPreviewDialog({ open, onOpenChange, pdfUrl, filename }: PdfPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[90vw] max-h-[90vh] h-[90vh] p-0">
-        <DialogHeader className="px-6 py-4 border-b">
+      <DialogContent className="max-w-[90vw] max-h-[90vh] h-[90vh] p-0 flex flex-col">
+        <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
           <DialogTitle className="text-lg font-semibold">{filename}</DialogTitle>
           <Button
             variant="ghost"
@@ -35,7 +35,7 @@ export function PdfPreviewDialog({ open, onOpenChange, pdfUrl, filename }: PdfPr
           </Button>
         </DialogHeader>
         
-        <div className="relative w-full h-full overflow-hidden">
+        <div className="relative w-full flex-1 overflow-hidden">
           {isLoading && !hasError && (
             <div className="absolute inset-0 flex items-center justify-center bg-background">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
