@@ -87,6 +87,19 @@ const Index = () => {
     setActiveChatId(chatId);
   };
 
+  const handleDeleteChat = (chatId: string) => {
+    setChatSessions((prev) => prev.filter((s) => s.id !== chatId));
+    
+    if (activeChatId === chatId) {
+      const remainingSessions = chatSessions.filter((s) => s.id !== chatId);
+      if (remainingSessions.length > 0) {
+        setActiveChatId(remainingSessions[0].id);
+      } else {
+        handleNewChat();
+      }
+    }
+  };
+
   const handleSessionUpdate = (messages: Message[], threadId: string | null) => {
     if (!activeChatId) return;
 
@@ -142,6 +155,7 @@ const Index = () => {
         chatSessions={chatSessions}
         activeChatId={activeChatId}
         onSelectChat={handleSelectChat}
+        onDeleteChat={handleDeleteChat}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         <ChatWelcome currentSession={currentSession} onSessionUpdate={handleSessionUpdate} />

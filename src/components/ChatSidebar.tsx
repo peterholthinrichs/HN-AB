@@ -1,4 +1,4 @@
-import { Plus, ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,7 @@ interface ChatSidebarProps {
   chatSessions: ChatSession[];
   activeChatId: string | null;
   onSelectChat: (chatId: string) => void;
+  onDeleteChat: (chatId: string) => void;
 }
 
 export const ChatSidebar = ({ 
@@ -37,7 +38,8 @@ export const ChatSidebar = ({
   onNewChat, 
   chatSessions, 
   activeChatId, 
-  onSelectChat 
+  onSelectChat,
+  onDeleteChat
 }: ChatSidebarProps) => {
   const [isEngineerExpanded, setIsEngineerExpanded] = useState(true);
 
@@ -130,7 +132,7 @@ export const ChatSidebar = ({
                         <button
                           key={session.id}
                           onClick={() => onSelectChat(session.id)}
-                          className={`w-full flex items-start gap-2 p-2 rounded-lg transition-colors text-left ${
+                          className={`w-full flex items-start gap-2 p-2 rounded-lg transition-colors text-left group ${
                             activeChatId === session.id
                               ? "bg-primary/10 border border-primary"
                               : "hover:bg-muted/50"
@@ -145,6 +147,16 @@ export const ChatSidebar = ({
                               {formatTimestamp(session.lastMessageAt)}
                             </p>
                           </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteChat(session.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive flex-shrink-0"
+                            aria-label="Chat verwijderen"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </button>
                       ))}
                     </div>
