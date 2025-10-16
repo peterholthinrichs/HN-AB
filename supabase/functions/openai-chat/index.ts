@@ -264,6 +264,27 @@ serve(async (req) => {
     console.log('Streaming run created');
     console.log('Response content-type:', runResponse.headers.get('content-type'));
 
+    // Helper function to extract text from various delta formats
+    function extractDeltaText(item: any): string | null {
+      if (!item) return null;
+      
+      // Handle different delta types
+      if (item.type === 'text' && item.text?.value) {
+        return item.text.value;
+      }
+      if (item.type === 'text_delta' && item.text?.value) {
+        return item.text.value;
+      }
+      if (item.type === 'output_text_delta' && typeof item.text === 'string') {
+        return item.text;
+      }
+      if (item.type === 'output_text' && typeof item.text === 'string') {
+        return item.text;
+      }
+      
+      return null;
+    }
+
     // Variables to store for caching
     let fullText = '';
     const citations: Array<{ file_id: string; quote?: string }> = [];
@@ -278,6 +299,8 @@ serve(async (req) => {
           const decoder = new TextDecoder();
           let buffer = '';
           let tokensEmitted = false;
+          let sawRunCompleted = false;
+          let eventCount = 0;
 
           if (!reader) {
             throw new Error('No response body');
@@ -291,7 +314,10 @@ serve(async (req) => {
 
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done) {
+              console.log('Stream reader done, tokens emitted:', tokensEmitted);
+              break;
+            }
 
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
@@ -300,146 +326,77 @@ serve(async (req) => {
             for (const line of lines) {
               if (line.startsWith('data: ')) {
                 const data = line.slice(6);
-                if (data === '[DONE]') continue;
+                if (data === '[DONE]') {
+                  console.log('[DONE] received, tokens emitted:', tokensEmitted);
+                  continue;
+                }
 
                 try {
                   const parsed = JSON.parse(data);
+                  
+                  // Log first few event names
+                  if (eventCount < 5) {
+                    console.log('SSE event:', parsed.event);
+                    eventCount++;
+                  }
                   
                   // Capture run ID
                   if (parsed.data?.id && !runId) {
                     runId = parsed.data.id;
                   }
                   
-                  // Handle delta events
+                  // Handle delta events - loop over all content items
                   if (parsed.event === 'thread.message.delta') {
-                    const delta = parsed.data?.delta?.content?.[0];
-                    if (delta?.type === 'text' && delta.text?.value) {
-                      const content = delta.text.value;
-                      fullText += content;
-                      tokensEmitted = true;
-                      
-                      // Forward to client
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
-                        type: 'token', 
-                        content 
-                      })}\n\n`));
-                    }
+                    const contentArray = parsed.data?.delta?.content || [];
                     
-                    // Extract annotations for citations
-                    if (delta?.text?.annotations) {
-                      for (const annotation of delta.text.annotations) {
-                        if (annotation.type === 'file_citation' && annotation.file_citation) {
-                          citations.push({
-                            file_id: annotation.file_citation.file_id,
-                            quote: annotation.file_citation.quote
-                          });
+                    for (const item of contentArray) {
+                      const textContent = extractDeltaText(item);
+                      if (textContent) {
+                        fullText += textContent;
+                        tokensEmitted = true;
+                        
+                        // Forward to client immediately
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                          type: 'token', 
+                          content: textContent 
+                        })}\n\n`));
+                      }
+                      
+                      // Extract annotations for citations from delta
+                      if (item.text?.annotations) {
+                        for (const annotation of item.text.annotations) {
+                          if (annotation.type === 'file_citation' && annotation.file_citation) {
+                            citations.push({
+                              file_id: annotation.file_citation.file_id,
+                              quote: annotation.file_citation.quote
+                            });
+                          }
                         }
                       }
                     }
                   }
                   
-                  // Handle completion
-                  if (parsed.event === 'thread.run.completed') {
-                    console.log('Run completed, tokens emitted:', tokensEmitted);
-                    
-                    // Fallback: If no tokens were emitted, poll for the message
-                    if (!tokensEmitted && runId) {
-                      console.log('No tokens streamed, using fallback to fetch messages');
-                      
-                      // Fetch the latest assistant message
-                      const messagesResponse = await fetch(
-                        `https://api.openai.com/v1/threads/${currentThreadId}/messages?order=desc&limit=1`,
-                        {
-                          headers: {
-                            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                            'OpenAI-Beta': 'assistants=v2'
-                          }
-                        }
-                      );
-                      
-                      if (messagesResponse.ok) {
-                        const messagesData = await messagesResponse.json();
-                        const lastMessage = messagesData.data?.[0];
-                        
-                        if (lastMessage?.role === 'assistant') {
-                          // Extract text from message content
-                          for (const item of lastMessage.content || []) {
-                            if (item.type === 'text' && item.text?.value) {
-                              fullText += item.text.value;
-                              
-                              // Stream it in chunks to simulate streaming
-                              const words = item.text.value.split(' ');
-                              for (const word of words) {
-                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
-                                  type: 'token', 
-                                  content: (fullText === word ? '' : ' ') + word
-                                })}\n\n`));
-                              }
-                              tokensEmitted = true;
-                              
-                              // Extract annotations
-                              if (item.text.annotations) {
-                                for (const annotation of item.text.annotations) {
-                                  if (annotation.type === 'file_citation' && annotation.file_citation) {
-                                    citations.push({
-                                      file_id: annotation.file_citation.file_id,
-                                      quote: annotation.file_citation.quote
-                                    });
-                                  }
-                                }
-                              }
-                            }
+                  // Handle completed message - extract additional citations
+                  if (parsed.event === 'thread.message.completed') {
+                    const contentArray = parsed.data?.content || [];
+                    for (const item of contentArray) {
+                      if (item.type === 'text' && item.text?.annotations) {
+                        for (const annotation of item.text.annotations) {
+                          if (annotation.type === 'file_citation' && annotation.file_citation) {
+                            citations.push({
+                              file_id: annotation.file_citation.file_id,
+                              quote: annotation.file_citation.quote
+                            });
                           }
                         }
                       }
                     }
-                    
-                    // Clean text
-                    fullText = fullText.replace(/【[^】]*】/g, '');
-                    fullText = fullText.replace(/Bron:\s*[^\n]+\.txt/gi, '');
-                    fullText = fullText.replace(/Bron:\s*[^\n]+/gi, '');
-                    fullText = fullText.replace(/\n\s*\n\s*\n/g, '\n\n');
-                    fullText = fullText.trim();
-
-                    // Get unique citations with filenames
-                    const uniqueCitations = Array.from(
-                      new Map(citations.map(c => [c.file_id, c])).values()
-                    );
-
-                    const citationsWithFilenames = await Promise.all(
-                      uniqueCitations.map(async (citation) => {
-                        try {
-                          const fileResponse = await fetch(`https://api.openai.com/v1/files/${citation.file_id}`, {
-                            headers: {
-                              'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                            }
-                          });
-                          const fileData = await fileResponse.json();
-                          return {
-                            ...citation,
-                            filename: fileData.filename || citation.file_id
-                          };
-                        } catch (error) {
-                          console.error('Error fetching file metadata:', error);
-                          return { ...citation, filename: citation.file_id };
-                        }
-                      })
-                    );
-
-                     // Cache the response
-                    console.log('Caching response...');
-                    await supabase.from('chat_responses').insert({
-                      question_hash: questionHash,
-                      question: trimmedMessage,
-                      answer: fullText,
-                      citations: citationsWithFilenames
-                    });
-
-                    // Send citations to client
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
-                      type: 'citations', 
-                      citations: citationsWithFilenames 
-                    })}\n\n`));
+                  }
+                  
+                  // Mark run as completed
+                  if (parsed.event === 'thread.run.completed') {
+                    sawRunCompleted = true;
+                    console.log('Run completed event received');
                   }
                 } catch (e) {
                   console.error('Error parsing SSE data:', e);
@@ -448,8 +405,132 @@ serve(async (req) => {
             }
           }
 
+          // End-of-stream fallback: If no tokens were emitted, fetch the message
+          if (!tokensEmitted) {
+            console.log('=== FALLBACK ACTIVATED: No tokens streamed, fetching message ===');
+            
+            try {
+              const messagesResponse = await fetch(
+                `https://api.openai.com/v1/threads/${currentThreadId}/messages?order=desc&limit=1`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                    'OpenAI-Beta': 'assistants=v2'
+                  }
+                }
+              );
+              
+              if (messagesResponse.ok) {
+                const messagesData = await messagesResponse.json();
+                const lastMessage = messagesData.data?.[0];
+                
+                if (lastMessage?.role === 'assistant') {
+                  console.log('Fallback: Found assistant message, streaming it now');
+                  
+                  // Extract text from message content
+                  for (const item of lastMessage.content || []) {
+                    if (item.type === 'text' && item.text?.value) {
+                      fullText += item.text.value;
+                      
+                      // Stream it word by word to simulate streaming
+                      const words = item.text.value.split(' ');
+                      for (let i = 0; i < words.length; i++) {
+                        const word = words[i];
+                        const content = i === 0 ? word : ' ' + word;
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                          type: 'token', 
+                          content
+                        })}\n\n`));
+                      }
+                      tokensEmitted = true;
+                      
+                      // Extract annotations
+                      if (item.text.annotations) {
+                        for (const annotation of item.text.annotations) {
+                          if (annotation.type === 'file_citation' && annotation.file_citation) {
+                            citations.push({
+                              file_id: annotation.file_citation.file_id,
+                              quote: annotation.file_citation.quote
+                            });
+                          }
+                        }
+                      }
+                    }
+                  }
+                  
+                  console.log('Fallback: Streamed', fullText.length, 'characters');
+                } else {
+                  console.log('Fallback: No assistant message found');
+                }
+              } else {
+                console.error('Fallback: Failed to fetch messages:', messagesResponse.status);
+              }
+            } catch (error) {
+              console.error('Fallback: Error fetching messages:', error);
+            }
+          }
+
+          // Final cleanup and completion
+          console.log('=== Finalizing response ===');
+          console.log('Tokens emitted:', tokensEmitted, 'Full text length:', fullText.length);
+          
+          // Clean text
+          fullText = fullText.replace(/【[^】]*】/g, '');
+          fullText = fullText.replace(/Bron:\s*[^\n]+\.txt/gi, '');
+          fullText = fullText.replace(/Bron:\s*[^\n]+/gi, '');
+          fullText = fullText.replace(/\n\s*\n\s*\n/g, '\n\n');
+          fullText = fullText.trim();
+
+          // Get unique citations with filenames
+          const uniqueCitations = Array.from(
+            new Map(citations.map(c => [c.file_id, c])).values()
+          );
+          
+          console.log('Processing', uniqueCitations.length, 'unique citations');
+
+          const citationsWithFilenames = await Promise.all(
+            uniqueCitations.map(async (citation) => {
+              try {
+                const fileResponse = await fetch(`https://api.openai.com/v1/files/${citation.file_id}`, {
+                  headers: {
+                    'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                  }
+                });
+                const fileData = await fileResponse.json();
+                return {
+                  ...citation,
+                  filename: fileData.filename || citation.file_id
+                };
+              } catch (error) {
+                console.error('Error fetching file metadata:', error);
+                return { ...citation, filename: citation.file_id };
+              }
+            })
+          );
+
+          // Cache the response
+          if (fullText.length > 0) {
+            console.log('Caching response...');
+            await supabase.from('chat_responses').insert({
+              question_hash: questionHash,
+              question: trimmedMessage,
+              answer: fullText,
+              citations: citationsWithFilenames
+            });
+          }
+
+          // Send citations to client
+          if (citationsWithFilenames.length > 0) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+              type: 'citations', 
+              citations: citationsWithFilenames 
+            })}\n\n`));
+          }
+
+          // Send final [DONE]
           controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
           controller.close();
+          console.log('=== Stream completed ===');
         } catch (error) {
           console.error('Stream error:', error);
           controller.error(error);
