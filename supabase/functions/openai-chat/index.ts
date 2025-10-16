@@ -1,10 +1,16 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Simple hash function for question caching
+function hashQuestion(question: string): string {
+  return btoa(question.toLowerCase().trim()).replace(/[^a-zA-Z0-9]/g, '');
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, threadId, runId } = await req.json();
+    const { message, threadId } = await req.json();
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const ASSISTANT_ID = "asst_u9SBVjdEmMgEyJtXkiOSkZMD";
     const VECTOR_STORE_ID = "vs_68ef575ffe4881918c0524c389babc60";
@@ -21,111 +27,69 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
-    // Check run status if runId provided
-    if (runId && threadId) {
-      console.log('Checking run status:', runId);
-      const statusResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${runId}`, {
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'OpenAI-Beta': 'assistants=v2'
+    // Initialize Supabase client for caching
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Check cache first
+    const questionHash = hashQuestion(message);
+    console.log('Checking cache for question hash:', questionHash);
+    
+    const { data: cachedResponse } = await supabase
+      .from('chat_responses')
+      .select('*')
+      .eq('question_hash', questionHash)
+      .single();
+
+    if (cachedResponse) {
+      console.log('Cache hit! Returning cached response');
+      
+      // Increment access count
+      await supabase
+        .from('chat_responses')
+        .update({ access_count: cachedResponse.access_count + 1 })
+        .eq('id', cachedResponse.id);
+
+      // Return cached response as SSE stream for consistent UX
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          // Send cached text as stream
+          const lines = cachedResponse.answer.split(' ');
+          let i = 0;
+          
+          const interval = setInterval(() => {
+            if (i < lines.length) {
+              const chunk = (i === 0 ? lines[i] : ' ' + lines[i]);
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                type: 'token', 
+                content: chunk 
+              })}\n\n`));
+              i++;
+            } else {
+              // Send citations
+              if (cachedResponse.citations) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                  type: 'citations', 
+                  citations: cachedResponse.citations 
+                })}\n\n`));
+              }
+              controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+              controller.close();
+              clearInterval(interval);
+            }
+          }, 30); // Simulate streaming speed
         }
       });
 
-      const runStatus = await statusResponse.json();
-      console.log('Run status:', runStatus.status);
-
-      if (runStatus.status === 'completed') {
-        // Fetch messages
-        const messagesResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages?limit=1&order=desc`, {
-          headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-            'OpenAI-Beta': 'assistants=v2'
-          }
-        });
-
-        const messagesData = await messagesResponse.json();
-        const lastMessage = messagesData.data[0];
-        
-        let text = '';
-        const citations: Array<{ file_id: string; quote?: string }> = [];
-        
-        if (lastMessage?.role === 'assistant' && lastMessage.content) {
-          for (const content of lastMessage.content) {
-            if (content.type === 'text' && content.text?.value) {
-              text += content.text.value;
-              
-              // Extract citations from annotations
-              if (content.text?.annotations) {
-                for (const annotation of content.text.annotations) {
-                  if (annotation.type === 'file_citation' && annotation.file_citation) {
-                    citations.push({
-                      file_id: annotation.file_citation.file_id,
-                      quote: annotation.file_citation.quote
-                    });
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Verwijder OpenAI annotation markers en bronvermeldingen uit de tekst
-        text = text.replace(/【[^】]*】/g, ''); // Verwijder 【source:X】 markers
-        text = text.replace(/Bron:\s*[^\n]+\.txt/gi, ''); // Verwijder "Bron: filename.txt" regels
-        text = text.replace(/Bron:\s*[^\n]+/gi, ''); // Verwijder andere "Bron: ..." regels
-        text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); // Cleanup extra lege regels
-        text = text.trim();
-
-        // Remove duplicate citations based on file_id
-        const uniqueCitations = Array.from(
-          new Map(citations.map(c => [c.file_id, c])).values()
-        );
-
-        // Fetch file metadata for each unique citation to get filenames
-        const citationsWithFilenames = await Promise.all(
-          uniqueCitations.map(async (citation) => {
-            try {
-              const fileResponse = await fetch(`https://api.openai.com/v1/files/${citation.file_id}`, {
-                headers: {
-                  'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                }
-              });
-              const fileData = await fileResponse.json();
-              return {
-                ...citation,
-                filename: fileData.filename || citation.file_id
-              };
-            } catch (error) {
-              console.error('Error fetching file metadata:', error);
-              return { ...citation, filename: citation.file_id };
-            }
-          })
-        );
-
-        return new Response(JSON.stringify({ 
-          status: 'completed', 
-          text,
-          citations: citationsWithFilenames
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } else if (runStatus.status === 'failed' || runStatus.status === 'cancelled' || runStatus.status === 'expired') {
-        return new Response(JSON.stringify({ 
-          status: runStatus.status,
-          error: runStatus.last_error?.message || 'Run failed'
-        }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } else {
-        // Still in progress
-        return new Response(JSON.stringify({ 
-          status: runStatus.status 
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+      return new Response(stream, {
+        headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' }
+      });
     }
+
+    console.log('Cache miss. Calling OpenAI...');
 
     // Create or use existing thread
     let currentThreadId = threadId;
@@ -175,8 +139,8 @@ serve(async (req) => {
 
     console.log('Message added successfully');
 
-    // Create run
-    console.log('Creating run...');
+    // Create run with streaming
+    console.log('Creating streaming run...');
     const runResponse = await fetch(`https://api.openai.com/v1/threads/${currentThreadId}/runs`, {
       method: 'POST',
       headers: {
@@ -191,7 +155,8 @@ serve(async (req) => {
           file_search: {
             vector_store_ids: [VECTOR_STORE_ID]
           }
-        }
+        },
+        stream: true
       })
     });
 
@@ -201,15 +166,143 @@ serve(async (req) => {
       throw new Error(`Failed to create run: ${error}`);
     }
 
-    const runData = await runResponse.json();
-    console.log('Run created:', runData.id);
+    console.log('Streaming run created');
 
-    return new Response(JSON.stringify({
-      threadId: currentThreadId,
-      runId: runData.id,
-      status: 'in_progress'
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    // Variables to store for caching
+    let fullText = '';
+    const citations: Array<{ file_id: string; quote?: string }> = [];
+
+    // Stream the response
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const reader = runResponse.body?.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          if (!reader) {
+            throw new Error('No response body');
+          }
+
+          // Send threadId first
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+            type: 'thread', 
+            threadId: currentThreadId 
+          })}\n\n`));
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+
+                try {
+                  const parsed = JSON.parse(data);
+                  
+                  // Handle delta events
+                  if (parsed.event === 'thread.message.delta') {
+                    const delta = parsed.data?.delta?.content?.[0];
+                    if (delta?.type === 'text' && delta.text?.value) {
+                      const content = delta.text.value;
+                      fullText += content;
+                      
+                      // Forward to client
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                        type: 'token', 
+                        content 
+                      })}\n\n`));
+                    }
+                    
+                    // Extract annotations for citations
+                    if (delta?.text?.annotations) {
+                      for (const annotation of delta.text.annotations) {
+                        if (annotation.type === 'file_citation' && annotation.file_citation) {
+                          citations.push({
+                            file_id: annotation.file_citation.file_id,
+                            quote: annotation.file_citation.quote
+                          });
+                        }
+                      }
+                    }
+                  }
+                  
+                  // Handle completion
+                  if (parsed.event === 'thread.run.completed') {
+                    console.log('Run completed');
+                    
+                    // Clean text
+                    fullText = fullText.replace(/【[^】]*】/g, '');
+                    fullText = fullText.replace(/Bron:\s*[^\n]+\.txt/gi, '');
+                    fullText = fullText.replace(/Bron:\s*[^\n]+/gi, '');
+                    fullText = fullText.replace(/\n\s*\n\s*\n/g, '\n\n');
+                    fullText = fullText.trim();
+
+                    // Get unique citations with filenames
+                    const uniqueCitations = Array.from(
+                      new Map(citations.map(c => [c.file_id, c])).values()
+                    );
+
+                    const citationsWithFilenames = await Promise.all(
+                      uniqueCitations.map(async (citation) => {
+                        try {
+                          const fileResponse = await fetch(`https://api.openai.com/v1/files/${citation.file_id}`, {
+                            headers: {
+                              'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                            }
+                          });
+                          const fileData = await fileResponse.json();
+                          return {
+                            ...citation,
+                            filename: fileData.filename || citation.file_id
+                          };
+                        } catch (error) {
+                          console.error('Error fetching file metadata:', error);
+                          return { ...citation, filename: citation.file_id };
+                        }
+                      })
+                    );
+
+                    // Cache the response
+                    console.log('Caching response...');
+                    await supabase.from('chat_responses').insert({
+                      question_hash: questionHash,
+                      question: message,
+                      answer: fullText,
+                      citations: citationsWithFilenames
+                    });
+
+                    // Send citations to client
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                      type: 'citations', 
+                      citations: citationsWithFilenames 
+                    })}\n\n`));
+                  }
+                } catch (e) {
+                  console.error('Error parsing SSE data:', e);
+                }
+              }
+            }
+          }
+
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+          controller.close();
+        } catch (error) {
+          console.error('Stream error:', error);
+          controller.error(error);
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' }
     });
 
   } catch (error) {

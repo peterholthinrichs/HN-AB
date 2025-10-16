@@ -56,43 +56,81 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
     scrollToBottom();
   }, [messages]);
 
-  const pollRunStatus = async (
-    threadId: string,
-    runId: string,
-  ): Promise<{ text: string; citations?: Array<{ file_id: string; filename?: string; quote?: string }> }> => {
-    const maxAttempts = 60; // 60 seconds max
-    let attempts = 0;
+  const streamResponse = async (userMessage: string): Promise<void> => {
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({
+        message: userMessage,
+        threadId: threadId,
+      }),
+    });
 
-    while (attempts < maxAttempts) {
-      await new Promise((resolve) => setTimeout(resolve, 300)); // Wait 300ms for faster updates
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ threadId, runId }),
-      });
-
-      const data = await response.json();
-      console.log("Poll result:", data);
-
-      // Update run status for UI feedback
-      setRunStatus(data.status || "");
-
-      if (data.status === "completed") {
-        setRunStatus("");
-        return { text: data.text, citations: data.citations };
-      } else if (data.status === "failed" || data.status === "cancelled" || data.status === "expired") {
-        setRunStatus("");
-        throw new Error(data.error || "Run failed");
-      }
-
-      attempts++;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    throw new Error("Timeout waiting for response");
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let streamedText = '';
+
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') {
+            setIsLoading(false);
+            return;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+
+            if (parsed.type === 'thread' && parsed.threadId) {
+              setThreadId(parsed.threadId);
+            } else if (parsed.type === 'token' && parsed.content) {
+              streamedText += parsed.content;
+              // Update the last message with accumulated text
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = {
+                  role: 'assistant',
+                  content: streamedText
+                };
+                return newMessages;
+              });
+            } else if (parsed.type === 'citations' && parsed.citations) {
+              // Add citations to the last message
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = {
+                  ...newMessages[newMessages.length - 1],
+                  citations: parsed.citations
+                };
+                return newMessages;
+              });
+            }
+          } catch (e) {
+            console.error('Error parsing SSE:', e);
+          }
+        }
+      }
+    }
   };
 
   const handleSend = async () => {
@@ -103,49 +141,12 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
+    // Add empty assistant message for streaming
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
     try {
-      console.log("Sending message...");
-
-      // Create run
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          message: userMessage,
-          threadId: threadId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log("Run created:", data);
-
-      if (data.threadId && !threadId) {
-        setThreadId(data.threadId);
-      }
-
-      // Add empty assistant message
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-
-      // Poll for completion
-      const result = await pollRunStatus(data.threadId, data.runId);
-
-      // Update assistant message
-      setMessages((prev) => {
-        const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = {
-          role: "assistant",
-          content: result.text,
-          citations: result.citations,
-        };
-        return newMessages;
-      });
+      console.log("Streaming message...");
+      await streamResponse(userMessage);
     } catch (error) {
       console.error("Error:", error);
       toast({
@@ -153,6 +154,7 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
         description: error instanceof Error ? error.message : "Er is een fout opgetreden",
         variant: "destructive",
       });
+      // Remove the empty assistant message on error
       setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
@@ -270,15 +272,7 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
                 ) : (
                   <div className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">
-                      {runStatus === "requires_action"
-                        ? "Zoeken in documenten..."
-                        : runStatus === "in_progress"
-                          ? "Aan het nadenken..."
-                          : runStatus === "queued"
-                            ? "In de wachtrij..."
-                            : "Bezig..."}
-                    </span>
+                    <span className="text-xs text-muted-foreground">Aan het typen...</span>
                   </div>
                 )}
               </div>

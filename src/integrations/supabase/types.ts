@@ -14,7 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_responses: {
+        Row: {
+          access_count: number | null
+          answer: string
+          citations: Json | null
+          created_at: string
+          id: string
+          question: string
+          question_hash: string
+        }
+        Insert: {
+          access_count?: number | null
+          answer: string
+          citations?: Json | null
+          created_at?: string
+          id?: string
+          question: string
+          question_hash: string
+        }
+        Update: {
+          access_count?: number | null
+          answer?: string
+          citations?: Json | null
+          created_at?: string
+          id?: string
+          question?: string
+          question_hash?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
