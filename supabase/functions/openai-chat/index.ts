@@ -20,10 +20,12 @@ async function verifyJWT(token: string, secret: string): Promise<boolean> {
       ["sign", "verify"]
     );
 
-    await verify(token, key);
+    const payload = await verify(token, key);
+    console.log("JWT verification successful", payload);
     return true;
   } catch (error) {
-    console.error("JWT verification failed");
+    console.error("JWT verification failed - Error details:", error);
+    console.error("Token preview:", token.substring(0, 20) + "...");
     return false;
   }
 }
@@ -50,7 +52,10 @@ serve(async (req) => {
     }
 
     const authHeader = req.headers.get('Authorization');
+    console.log("Auth header present:", !!authHeader);
+    
     if (!authHeader?.startsWith('Bearer ')) {
+      console.error("Missing or invalid Authorization header format");
       return new Response(
         JSON.stringify({ error: 'Niet geauthenticeerd' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -58,14 +63,18 @@ serve(async (req) => {
     }
 
     const token = authHeader.substring(7);
+    console.log("Attempting JWT verification...");
     const isValid = await verifyJWT(token, jwtSecret);
     
     if (!isValid) {
+      console.error("JWT verification returned false");
       return new Response(
         JSON.stringify({ error: 'Ongeldige authenticatie' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log("JWT verification passed successfully");
 
     const { message, threadId } = await req.json();
     

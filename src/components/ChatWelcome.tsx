@@ -78,7 +78,14 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (response.status === 401) {
+        // Authentication failed - redirect to login
+        localStorage.removeItem('auth_token');
+        window.location.href = '/login';
+        throw new Error('Sessie verlopen, log opnieuw in');
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
 
     const reader = response.body?.getReader();
