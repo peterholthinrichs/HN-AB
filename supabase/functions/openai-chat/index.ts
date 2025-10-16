@@ -218,9 +218,9 @@ serve(async (req) => {
 
     console.log('Message added successfully');
 
-    // Create run with streaming using the dedicated streaming endpoint
+    // Create run with streaming
     console.log('Creating streaming run...');
-    const runResponse = await fetch(`https://api.openai.com/v1/threads/${currentThreadId}/runs/stream`, {
+    const runResponse = await fetch(`https://api.openai.com/v1/threads/${currentThreadId}/runs`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
@@ -230,6 +230,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         assistant_id: ASSISTANT_ID,
+        stream: true,
         additional_instructions: "Belangrijk: Geef je antwoord ALTIJD in het Nederlands, ongeacht de taal waarin de vraag wordt gesteld.",
         tool_resources: {
           file_search: {
@@ -242,6 +243,21 @@ serve(async (req) => {
     if (!runResponse.ok) {
       const error = await runResponse.text();
       console.error('Run creation error:', error);
+      
+      // Handle rate limits and payment errors specifically
+      if (runResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Te veel verzoeken, probeer het later opnieuw.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (runResponse.status === 402) {
+        return new Response(
+          JSON.stringify({ error: 'Betaling vereist, neem contact op met de beheerder.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       throw new Error(`Failed to create run: ${error}`);
     }
 
