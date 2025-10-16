@@ -244,8 +244,8 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
                             .trim()
                             .replace(/\s+/g, '_');
                           
-                          // Use storage URL for all PDFs
-                          const documentUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/documents/${pdfFilename}`;
+                          // Use local URL from public/documents folder
+                          const documentUrl = `/documents/${pdfFilename}`;
                           
                           return (
                             <div key={idx} className="text-xs text-muted-foreground mb-2">
