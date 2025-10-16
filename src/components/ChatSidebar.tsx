@@ -147,16 +147,24 @@ export const ChatSidebar = ({
                               {formatTimestamp(session.lastMessageAt)}
                             </p>
                           </div>
-                          <button
+                          <span
+                            role="button"
+                            tabIndex={0}
                             onClick={(e) => {
                               e.stopPropagation();
                               onDeleteChat(session.id);
                             }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive flex-shrink-0"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                onDeleteChat(session.id);
+                              }
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive flex-shrink-0 cursor-pointer"
                             aria-label="Chat verwijderen"
                           >
                             <X className="w-4 h-4" />
-                          </button>
+                          </span>
                         </button>
                       ))}
                     </div>

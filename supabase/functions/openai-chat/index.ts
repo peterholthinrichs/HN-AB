@@ -218,13 +218,14 @@ serve(async (req) => {
 
     console.log('Message added successfully');
 
-    // Create run with streaming
+    // Create run with streaming using the dedicated streaming endpoint
     console.log('Creating streaming run...');
-    const runResponse = await fetch(`https://api.openai.com/v1/threads/${currentThreadId}/runs`, {
+    const runResponse = await fetch(`https://api.openai.com/v1/threads/${currentThreadId}/runs/stream`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
         'OpenAI-Beta': 'assistants=v2'
       },
       body: JSON.stringify({
@@ -234,8 +235,7 @@ serve(async (req) => {
           file_search: {
             vector_store_ids: [VECTOR_STORE_ID]
           }
-        },
-        stream: true
+        }
       })
     });
 
@@ -246,10 +246,12 @@ serve(async (req) => {
     }
 
     console.log('Streaming run created');
+    console.log('Response content-type:', runResponse.headers.get('content-type'));
 
     // Variables to store for caching
     let fullText = '';
     const citations: Array<{ file_id: string; quote?: string }> = [];
+    let runId = '';
 
     // Stream the response
     const encoder = new TextEncoder();
@@ -259,6 +261,7 @@ serve(async (req) => {
           const reader = runResponse.body?.getReader();
           const decoder = new TextDecoder();
           let buffer = '';
+          let tokensEmitted = false;
 
           if (!reader) {
             throw new Error('No response body');
@@ -286,12 +289,18 @@ serve(async (req) => {
                 try {
                   const parsed = JSON.parse(data);
                   
+                  // Capture run ID
+                  if (parsed.data?.id && !runId) {
+                    runId = parsed.data.id;
+                  }
+                  
                   // Handle delta events
                   if (parsed.event === 'thread.message.delta') {
                     const delta = parsed.data?.delta?.content?.[0];
                     if (delta?.type === 'text' && delta.text?.value) {
                       const content = delta.text.value;
                       fullText += content;
+                      tokensEmitted = true;
                       
                       // Forward to client
                       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
@@ -315,7 +324,59 @@ serve(async (req) => {
                   
                   // Handle completion
                   if (parsed.event === 'thread.run.completed') {
-                    console.log('Run completed');
+                    console.log('Run completed, tokens emitted:', tokensEmitted);
+                    
+                    // Fallback: If no tokens were emitted, poll for the message
+                    if (!tokensEmitted && runId) {
+                      console.log('No tokens streamed, using fallback to fetch messages');
+                      
+                      // Fetch the latest assistant message
+                      const messagesResponse = await fetch(
+                        `https://api.openai.com/v1/threads/${currentThreadId}/messages?order=desc&limit=1`,
+                        {
+                          headers: {
+                            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                            'OpenAI-Beta': 'assistants=v2'
+                          }
+                        }
+                      );
+                      
+                      if (messagesResponse.ok) {
+                        const messagesData = await messagesResponse.json();
+                        const lastMessage = messagesData.data?.[0];
+                        
+                        if (lastMessage?.role === 'assistant') {
+                          // Extract text from message content
+                          for (const item of lastMessage.content || []) {
+                            if (item.type === 'text' && item.text?.value) {
+                              fullText += item.text.value;
+                              
+                              // Stream it in chunks to simulate streaming
+                              const words = item.text.value.split(' ');
+                              for (const word of words) {
+                                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                                  type: 'token', 
+                                  content: (fullText === word ? '' : ' ') + word
+                                })}\n\n`));
+                              }
+                              tokensEmitted = true;
+                              
+                              // Extract annotations
+                              if (item.text.annotations) {
+                                for (const annotation of item.text.annotations) {
+                                  if (annotation.type === 'file_citation' && annotation.file_citation) {
+                                    citations.push({
+                                      file_id: annotation.file_citation.file_id,
+                                      quote: annotation.file_citation.quote
+                                    });
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
                     
                     // Clean text
                     fullText = fullText.replace(/【[^】]*】/g, '');

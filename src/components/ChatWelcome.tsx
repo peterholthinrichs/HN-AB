@@ -84,6 +84,12 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
         window.location.href = '/login';
         throw new Error('Sessie verlopen, log opnieuw in');
       }
+      if (response.status === 429) {
+        throw new Error('Te veel verzoeken, probeer het later opnieuw');
+      }
+      if (response.status === 402) {
+        throw new Error('Betaling vereist, voeg fondsen toe aan je account');
+      }
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
@@ -109,6 +115,23 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
         if (line.startsWith('data: ')) {
           const data = line.slice(6).trim();
           if (data === '[DONE]') {
+            // Check if we received any content
+            if (!streamedText.trim()) {
+              // No answer received
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = {
+                  role: 'assistant',
+                  content: 'Geen antwoord ontvangen, probeer het opnieuw.'
+                };
+                return newMessages;
+              });
+              toast({
+                title: "Geen antwoord",
+                description: "Probeer je vraag opnieuw te stellen",
+                variant: "destructive",
+              });
+            }
             setIsLoading(false);
             return;
           }
