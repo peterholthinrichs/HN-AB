@@ -293,13 +293,14 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
                       <div className="mt-4 pt-4 border-t border-border/40">
                         <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
                       {msg.citations.map((citation, idx) => {
-                          // Convert .txt extension to .pdf for document links and normalize filename
+                          // Normalize filename with consistent logic
                           const filename = citation.filename || `Bron ${idx + 1}`;
                           const pdfFilename = filename
-                            .replace(/\.txt$/i, '.pdf')
-                            .trim()
-                            .replace(/\s+/g, '_')
-                            .replace(/_+\.pdf$/i, '.pdf'); // Remove trailing underscores before .pdf
+                            .trim()                          // First trim whitespace
+                            .replace(/\s+/g, '_')            // Replace spaces with underscores
+                            .replace(/\.txt$/i, '.pdf')      // Convert .txt to .pdf
+                            .replace(/_+/g, '_')             // Consolidate multiple underscores
+                            .replace(/_+\.pdf$/i, '.pdf');   // Remove trailing underscores before .pdf
                           
                           // Get public URL from storage
                           const { data } = supabase.storage.from("documents").getPublicUrl(pdfFilename);

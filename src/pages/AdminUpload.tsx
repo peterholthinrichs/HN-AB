@@ -102,11 +102,12 @@ export default function AdminUpload() {
         // Convert file to base64
         const fileBase64 = await fileToBase64(fileStatus.file);
 
-        // Sanitize filename: trim, replace spaces with underscores, remove trailing underscores
+        // Sanitize filename with consistent normalization logic
         const sanitizedFilename = fileStatus.file.name
-          .trim()
-          .replace(/\s+/g, '_')
-          .replace(/_+\.pdf$/i, '.pdf');
+          .trim()                          // First trim whitespace
+          .replace(/\s+/g, '_')            // Replace spaces with underscores
+          .replace(/_+/g, '_')             // Consolidate multiple underscores
+          .replace(/_+\.pdf$/i, '.pdf');   // Remove trailing underscores before .pdf
 
         // Upload to backend
         const response = await fetch(
