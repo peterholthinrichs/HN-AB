@@ -30,6 +30,8 @@ export default function AdminUpload() {
 
   const uploadPdfs = async () => {
     setIsUploading(true);
+    let successCount = 0;
+    let errorCount = 0;
     
     for (const filename of PDFS_TO_UPLOAD) {
       setUploadStatus(prev => ({ ...prev, [filename]: 'uploading' }));
@@ -54,20 +56,29 @@ export default function AdminUpload() {
         if (error) throw error;
         
         setUploadStatus(prev => ({ ...prev, [filename]: 'success' }));
+        successCount++;
       } catch (error) {
         console.error(`Error uploading ${filename}:`, error);
         setUploadStatus(prev => ({ ...prev, [filename]: 'error' }));
+        errorCount++;
       }
     }
     
     setIsUploading(false);
     
-    const successCount = Object.values(uploadStatus).filter(s => s === 'success').length;
     if (successCount === PDFS_TO_UPLOAD.length) {
       toast.success('Alle PDFs succesvol geüpload!');
+    } else if (successCount > 0) {
+      toast.warning(`${successCount} van ${PDFS_TO_UPLOAD.length} PDFs geüpload. ${errorCount} mislukt.`);
     } else {
-      toast.error('Sommige PDFs konden niet worden geüpload');
+      toast.error('Geen PDFs geüpload. Alle uploads zijn mislukt.');
     }
+  };
+
+  const resetStatus = () => {
+    setUploadStatus(
+      PDFS_TO_UPLOAD.reduce((acc, pdf) => ({ ...acc, [pdf]: 'pending' }), {})
+    );
   };
 
   return (
@@ -81,23 +92,32 @@ export default function AdminUpload() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button 
-              onClick={uploadPdfs} 
-              disabled={isUploading}
-              className="w-full"
-            >
-              {isUploading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploaden...
-                </>
-              ) : (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Alle PDFs
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={uploadPdfs} 
+                disabled={isUploading}
+                className="flex-1"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploaden...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload Alle PDFs
+                  </>
+                )}
+              </Button>
+              <Button 
+                onClick={resetStatus} 
+                disabled={isUploading}
+                variant="outline"
+              >
+                Reset
+              </Button>
+            </div>
 
             <div className="space-y-2">
               {PDFS_TO_UPLOAD.map((filename) => (
