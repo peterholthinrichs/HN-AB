@@ -102,6 +102,12 @@ export default function AdminUpload() {
         // Convert file to base64
         const fileBase64 = await fileToBase64(fileStatus.file);
 
+        // Sanitize filename: trim, replace spaces with underscores, remove trailing underscores
+        const sanitizedFilename = fileStatus.file.name
+          .trim()
+          .replace(/\s+/g, '_')
+          .replace(/_+\.pdf$/i, '.pdf');
+
         // Upload to backend
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-upload`,
@@ -112,7 +118,7 @@ export default function AdminUpload() {
               'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify({
-              filename: fileStatus.file.name,
+              filename: sanitizedFilename,
               fileBase64
             })
           }

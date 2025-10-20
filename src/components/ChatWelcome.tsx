@@ -7,6 +7,7 @@ import { Message, ChatSession } from "@/types/chat";
 import { PdfPreviewDialog } from "@/components/PdfPreviewDialog";
 import { getAuthToken } from "@/lib/auth";
 import DOMPurify from 'dompurify';
+import { supabase } from "@/integrations/supabase/client";
 
 const suggestions = [
   "Welke sensoren (Shr2, Shr3, Shr4, Shr8) zijn verplicht voor een veilige werking van de warmteterugwinning, en waar worden ze geplaatst?",
@@ -291,16 +292,18 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
                     {msg.role === "assistant" && msg.citations && msg.citations.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-border/40">
                         <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
-                        {msg.citations.map((citation, idx) => {
+                      {msg.citations.map((citation, idx) => {
                           // Convert .txt extension to .pdf for document links and normalize filename
                           const filename = citation.filename || `Bron ${idx + 1}`;
                           const pdfFilename = filename
                             .replace(/\.txt$/i, '.pdf')
                             .trim()
-                            .replace(/\s+/g, '_');
+                            .replace(/\s+/g, '_')
+                            .replace(/_+\.pdf$/i, '.pdf'); // Remove trailing underscores before .pdf
                           
-                          // Use local URL from public/documents folder
-                          const documentUrl = `/documents/${pdfFilename}`;
+                          // Get public URL from storage
+                          const { data } = supabase.storage.from("documents").getPublicUrl(pdfFilename);
+                          const documentUrl = data.publicUrl;
                           
                           return (
                             <div key={idx} className="text-xs text-muted-foreground mb-2">
