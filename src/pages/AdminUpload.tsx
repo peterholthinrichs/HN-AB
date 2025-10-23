@@ -204,7 +204,10 @@ export default function AdminUpload() {
       if (error) throw error;
       
       const pdfFiles = data.filter(file => file.name.toLowerCase().endsWith('.pdf'));
-      setExistingFiles(pdfFiles.map(f => ({ name: f.name, size: f.metadata?.size || 0 })));
+      setExistingFiles(pdfFiles.map(f => ({ 
+        name: f.name, 
+        size: (f as any).size ?? f.metadata?.size ?? 0 
+      })));
     } catch (error) {
       console.error('Error fetching files:', error);
       toast.error('Kon bestanden niet ophalen');
