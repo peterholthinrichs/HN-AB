@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MessageSquare, ArrowUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/pool-logo.png";
+import logo from "@/assets/logo.png";
 import { useToast } from "@/hooks/use-toast";
 import { Message, ChatSession } from "@/types/chat";
 import { PdfPreviewDialog } from "@/components/PdfPreviewDialog";
