@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/pool-logo.png";
 
 const Login = () => {
   const [username, setUsername] = useState("");

@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import engineerAvatar from "@/assets/engineer-avatar.png";
 import henkAvatar from "@/assets/henk-avatar.png";
 import hrAvatar from "@/assets/hr-avatar.png";
+import logo from "@/assets/pool-logo.png";
 import { ChatSession } from "@/types/chat";
 import { useState } from "react";
 
@@ -179,9 +180,7 @@ export const ChatSidebar = ({
       {/* Footer Branding */}
       <div className="p-4 border-t border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center">
-            <span className="text-accent-foreground font-bold text-sm">PT</span>
-          </div>
+          <img src={logo} alt="POOL techniek logo" className="h-10 w-auto" />
           <span className="font-medium text-foreground text-sm">POOL techniek</span>
         </div>
       </div>
