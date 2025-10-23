@@ -16,11 +16,11 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Trim inputs before validation
     const trimmedUsername = username.trim();
     const trimmedPassword = password.trim();
-    
+
     if (!trimmedUsername || !trimmedPassword) {
       toast({
         title: "Fout",
@@ -33,19 +33,16 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ 
-            username: trimmedUsername, 
-            password: trimmedPassword 
-          }),
-        }
-      );
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: trimmedUsername,
+          password: trimmedPassword,
+        }),
+      });
 
       const data = await response.json();
 
@@ -94,7 +91,7 @@ const Login = () => {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="pool"
+              placeholder="username"
               disabled={isLoading}
               className="w-full"
               autoComplete="username"
@@ -115,11 +112,7 @@ const Login = () => {
             />
           </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading}
-          >
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
