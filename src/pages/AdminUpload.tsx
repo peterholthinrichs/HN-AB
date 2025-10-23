@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Upload, CheckCircle, XCircle, Loader2, FileText, X, Trash2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { PdfPreviewDialog } from '@/components/PdfPreviewDialog';
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error';
 
@@ -22,6 +23,7 @@ export default function AdminUpload() {
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [selectedForDelete, setSelectedForDelete] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [previewPdf, setPreviewPdf] = useState<{ url: string; filename: string } | null>(null);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -188,6 +190,18 @@ export default function AdminUpload() {
     const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const getPdfUrl = (filename: string): string => {
+    const { data } = supabase.storage
+      .from('documents')
+      .getPublicUrl(filename);
+    return data.publicUrl;
+  };
+
+  const handlePreviewPdf = (filename: string) => {
+    const url = getPdfUrl(filename);
+    setPreviewPdf({ url, filename });
   };
 
   const fetchExistingFiles = async () => {
@@ -458,7 +472,8 @@ export default function AdminUpload() {
                 {existingFiles.map((file) => (
                   <div
                     key={file.name}
-                    className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
+                    className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                    onClick={() => handlePreviewPdf(file.name)}
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <Checkbox 
@@ -474,6 +489,7 @@ export default function AdminUpload() {
                             return newSet;
                           });
                         }}
+                        onClick={(e) => e.stopPropagation()}
                       />
                       <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -487,7 +503,10 @@ export default function AdminUpload() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeleteSingle(file.name)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSingle(file.name);
+                      }}
                       disabled={isDeleting}
                       className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     >
@@ -500,6 +519,13 @@ export default function AdminUpload() {
           </CardContent>
         </Card>
       </div>
+
+      <PdfPreviewDialog
+        open={previewPdf !== null}
+        onOpenChange={(open) => !open && setPreviewPdf(null)}
+        pdfUrl={previewPdf?.url || ''}
+        filename={previewPdf?.filename || ''}
+      />
     </div>
   );
 }
