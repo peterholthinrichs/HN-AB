@@ -1,9 +1,11 @@
-import { useState, ChangeEvent } from 'react';
+import { useState, ChangeEvent, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Upload, CheckCircle, XCircle, Loader2, FileText, X } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, Loader2, FileText, X, Trash2, RefreshCw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error';
 
@@ -16,6 +18,10 @@ interface FileStatus {
 export default function AdminUpload() {
   const [selectedFiles, setSelectedFiles] = useState<FileStatus[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [existingFiles, setExistingFiles] = useState<Array<{ name: string; size: number }>>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [selectedForDelete, setSelectedForDelete] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -184,6 +190,64 @@ export default function AdminUpload() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
+  const fetchExistingFiles = async () => {
+    setIsLoadingFiles(true);
+    try {
+      const { data, error } = await supabase
+        .storage
+        .from('documents')
+        .list('', {
+          limit: 1000,
+          sortBy: { column: 'name', order: 'asc' }
+        });
+
+      if (error) throw error;
+      
+      const pdfFiles = data.filter(file => file.name.toLowerCase().endsWith('.pdf'));
+      setExistingFiles(pdfFiles.map(f => ({ name: f.name, size: f.metadata?.size || 0 })));
+    } catch (error) {
+      console.error('Error fetching files:', error);
+      toast.error('Kon bestanden niet ophalen');
+    } finally {
+      setIsLoadingFiles(false);
+    }
+  };
+
+  const deleteFiles = async (filenames: string[]) => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .storage
+        .from('documents')
+        .remove(filenames);
+
+      if (error) throw error;
+
+      toast.success(`${filenames.length} bestand${filenames.length !== 1 ? 'en' : ''} verwijderd`);
+      
+      await fetchExistingFiles();
+      setSelectedForDelete(new Set());
+    } catch (error) {
+      console.error('Error deleting files:', error);
+      toast.error('Kon bestanden niet verwijderen');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedForDelete.size === 0) return;
+    deleteFiles(Array.from(selectedForDelete));
+  };
+
+  const handleDeleteSingle = (filename: string) => {
+    deleteFiles([filename]);
+  };
+
+  useEffect(() => {
+    fetchExistingFiles();
+  }, []);
+
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-4xl mx-auto">
@@ -331,6 +395,103 @@ export default function AdminUpload() {
                 <p className="text-xs text-muted-foreground mt-1">
                   Klik op "Bladeren" hierboven om PDF bestanden te selecteren
                 </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Bestaande PDF Bestanden</CardTitle>
+            <CardDescription>
+              Bekijk en verwijder PDF bestanden uit de storage bucket
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Button 
+                onClick={fetchExistingFiles} 
+                disabled={isLoadingFiles}
+                variant="outline"
+                size="sm"
+              >
+                {isLoadingFiles ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Laden...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Ververs
+                  </>
+                )}
+              </Button>
+              
+              {selectedForDelete.size > 0 && (
+                <Button 
+                  onClick={handleDeleteSelected}
+                  disabled={isDeleting}
+                  variant="destructive"
+                  size="sm"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Verwijder {selectedForDelete.size} geselecteerd{selectedForDelete.size !== 1 ? 'e' : ''}
+                </Button>
+              )}
+            </div>
+
+            {isLoadingFiles ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+              </div>
+            ) : existingFiles.length === 0 ? (
+              <div className="text-center py-8 border-2 border-dashed rounded-lg">
+                <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">Geen PDF bestanden gevonden</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {existingFiles.map((file) => (
+                  <div
+                    key={file.name}
+                    className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <Checkbox 
+                        checked={selectedForDelete.has(file.name)}
+                        onCheckedChange={(checked) => {
+                          setSelectedForDelete(prev => {
+                            const newSet = new Set(prev);
+                            if (checked) {
+                              newSet.add(file.name);
+                            } else {
+                              newSet.delete(file.name);
+                            }
+                            return newSet;
+                          });
+                        }}
+                      />
+                      <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{file.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(file.size)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteSingle(file.name)}
+                      disabled={isDeleting}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>
