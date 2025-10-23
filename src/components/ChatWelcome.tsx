@@ -8,6 +8,7 @@ import { PdfPreviewDialog } from "@/components/PdfPreviewDialog";
 import { getAuthToken } from "@/lib/auth";
 import DOMPurify from 'dompurify';
 import { supabase } from "@/integrations/supabase/client";
+import { FunnelState, DEFAULT_FUNNEL } from "@/types/funnel";
 
 const suggestions = [
   "Welke sensoren (Shr2, Shr3, Shr4, Shr8) zijn verplicht voor een veilige werking van de warmteterugwinning, en waar worden ze geplaatst?",
@@ -31,6 +32,7 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
     url: string;
     filename: string;
   } | null>(null);
+  const [funnelState, setFunnelState] = useState<FunnelState | null>(null);
   const { toast } = useToast();
 
   // Update session when messages or threadId change
@@ -58,6 +60,63 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const handleFunnelResponse = (userAnswer: string) => {
+    if (!funnelState) return;
+    
+    const currentQ = funnelState.questions[funnelState.currentStep];
+    
+    // Opslaan antwoord
+    const newData = {
+      ...funnelState.collectedData,
+      [currentQ.id]: userAnswer
+    };
+    
+    const nextStep = funnelState.currentStep + 1;
+    const isLastQuestion = nextStep >= funnelState.questions.length;
+    
+    if (isLastQuestion) {
+      // LAATSTE VRAAG → verstuur naar AI
+      const compiledPrompt = `
+De gebruiker heeft de volgende informatie gegeven:
+
+Oorspronkelijke vraag: ${newData.initial_question || 'Geen'}
+Component type: ${newData.component_type}
+Typenummer: ${newData.type_number}
+Details: ${newData.details}
+
+Beantwoord de vraag op basis van de technische documentatie.
+      `.trim();
+      
+      // Sluit funnel af
+      setFunnelState(null);
+      
+      // Voeg loading message toe
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: ""
+      }]);
+      setIsLoading(true);
+      
+      // Verstuur naar AI
+      streamResponse(compiledPrompt).finally(() => setIsLoading(false));
+      
+    } else {
+      // VOLGENDE VRAAG
+      const nextQ = funnelState.questions[nextStep];
+      
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: nextQ.question
+      }]);
+      
+      setFunnelState({
+        ...funnelState,
+        currentStep: nextStep,
+        collectedData: newData
+      });
+    }
+  };
 
   const streamResponse = async (userMessage: string): Promise<void> => {
     const token = getAuthToken();
@@ -189,6 +248,37 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
     }
 
     setMessage("");
+    
+    // Als er nog geen messages zijn EN funnel is niet actief → start funnel
+    if (messages.length === 0 && !funnelState) {
+      // Voeg user message toe
+      setMessages([{ role: "user", content: trimmedMessage }]);
+      
+      // Start funnel met eerste vraag
+      setFunnelState({
+        isActive: true,
+        currentStep: 0,
+        collectedData: {
+          initial_question: trimmedMessage
+        },
+        questions: DEFAULT_FUNNEL
+      });
+      
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: DEFAULT_FUNNEL[0].question
+      }]);
+      return;
+    }
+    
+    // Als funnel actief is → verwerk funnel antwoord
+    if (funnelState?.isActive) {
+      setMessages(prev => [...prev, { role: "user", content: trimmedMessage }]);
+      handleFunnelResponse(trimmedMessage);
+      return;
+    }
+
+    // Normale chat (na funnel)
     setMessages((prev) => [...prev, { role: "user", content: trimmedMessage }]);
     setIsLoading(true);
 
@@ -228,7 +318,11 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Wat voor werkzaamheden zijn verricht voor Holiday Ice?"
+              placeholder={
+                funnelState?.isActive 
+                  ? funnelState.questions[funnelState.currentStep].placeholder || "Type je antwoord..."
+                  : "Wat voor werkzaamheden zijn verricht voor Holiday Ice?"
+              }
               className="w-full px-6 py-4 pr-14 rounded-2xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-sm"
               disabled={isLoading}
             />
@@ -347,7 +441,11 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Typ je bericht hier..."
+              placeholder={
+                funnelState?.isActive 
+                  ? funnelState.questions[funnelState.currentStep].placeholder || "Type je antwoord..."
+                  : "Typ je bericht hier..."
+              }
               disabled={isLoading}
               className="w-full px-6 py-4 pr-14 rounded-2xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-sm"
             />
