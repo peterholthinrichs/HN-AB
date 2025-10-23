@@ -3,10 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Link } from "react-router-dom";
 import engineerAvatar from "@/assets/engineer-avatar.png";
 import henkAvatar from "@/assets/henk-avatar.png";
 import hrAvatar from "@/assets/hr-avatar.png";
 import poolLogo from "@/assets/pool-logo.png";
+import uploadIcon from "@/assets/upload-icon.png";
 import { ChatSession } from "@/types/chat";
 import { useState } from "react";
 
@@ -184,6 +186,9 @@ export const ChatSidebar = ({
             <img src={poolLogo} alt="POOL techniek logo" className="w-full h-full object-contain" />
           </div>
           <span className="font-medium text-foreground text-sm">POOL techniek</span>
+          <Link to="/admin/upload" className="ml-auto">
+            <img src={uploadIcon} alt="Upload" className="w-6 h-6 object-contain hover:opacity-70 transition-opacity cursor-pointer" />
+          </Link>
         </div>
       </div>
     </aside>
