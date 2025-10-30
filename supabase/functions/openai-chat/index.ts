@@ -280,7 +280,11 @@ serve(async (req) => {
       body: JSON.stringify({
         assistant_id: ASSISTANT_ID,
         stream: true,
-        additional_instructions: "Belangrijk: Geef je antwoord ALTIJD in het Nederlands, ongeacht de taal waarin de vraag wordt gesteld. Vermeld ALTIJD aan het einde van je antwoord uit welke specifieke document(en) je de informatie hebt gehaald. Gebruik het formaat: 'Bron: [documentnaam].pdf'",
+        additional_instructions: `Belangrijk: 
+1. Geef je antwoord ALTIJD in het Nederlands, ongeacht de taal waarin de vraag wordt gesteld
+2. KRITISCH: Gebruik ALTIJD file_search citations in je antwoord. Als je informatie uit documenten haalt, moet je VERPLICHT citations toevoegen
+3. Vermeld ook in de tekst zelf de bron in het formaat: "Bron: [documentnaam].pdf"
+4. Zonder citations is je antwoord ONVOLLEDIG`,
         tool_resources: {
           file_search: {
             vector_store_ids: [VECTOR_STORE_ID]
@@ -495,14 +499,21 @@ serve(async (req) => {
                       
                       // Extract annotations
                       if (item.text.annotations) {
+                        console.log('=== OpenAI Annotations Debug ===');
+                        console.log('Found annotations:', item.text.annotations.length);
+                        console.log('Annotations data:', JSON.stringify(item.text.annotations, null, 2));
+                        
                         for (const annotation of item.text.annotations) {
                           if (annotation.type === 'file_citation' && annotation.file_citation) {
                             citations.push({
                               file_id: annotation.file_citation.file_id,
                               quote: annotation.file_citation.quote
                             });
+                            console.log('Citation added:', annotation.file_citation.file_id);
                           }
                         }
+                      } else {
+                        console.log('⚠️ No annotations found in text item');
                       }
                     }
                   }

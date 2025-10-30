@@ -61,6 +61,32 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
     scrollToBottom();
   }, [messages]);
 
+  // Extract PDF references from text content as fallback
+  const extractPdfReferencesFromText = (content: string): string[] => {
+    const patterns = [
+      /Bron:\s*([^\s,\n]+\.pdf)/gi,           // "Bron: filename.pdf"
+      /Bron:\s*([^\s,\n]+\.txt)/gi,           // "Bron: filename.txt"
+      /Bron:\s*([^\s,\n]+\.json)/gi,          // "Bron: filename.json"
+      /\b([A-Z][a-zA-Z0-9_-]+\.pdf)\b/g,      // Any filename.pdf pattern
+    ];
+    
+    const matches: string[] = [];
+    patterns.forEach(pattern => {
+      const found = content.matchAll(pattern);
+      for (const match of found) {
+        if (match[1]) {
+          // Normalize to PDF format
+          const normalized = match[1]
+            .replace(/\.(json|txt)$/i, '.pdf')
+            .replace(/\s+/g, '_');
+          matches.push(normalized);
+        }
+      }
+    });
+    
+    return [...new Set(matches)]; // Remove duplicates
+  };
+
   const handleFunnelResponse = (userAnswer: string) => {
     if (!funnelState) return;
     
@@ -383,9 +409,10 @@ Beantwoord de vraag op basis van de technische documentatie.
                       ),
                     }}
                   />
-                    {msg.role === "assistant" && (
-                      <>
-                        {msg.citations && msg.citations.length > 0 ? (
+                    {msg.role === "assistant" && (() => {
+                      // Layer 1: Use OpenAI citations if available
+                      if (msg.citations && msg.citations.length > 0) {
+                        return (
                           <div className="mt-4 pt-4 border-t border-border/40">
                             <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
                             {msg.citations.map((citation, idx) => {
@@ -420,16 +447,44 @@ Beantwoord de vraag op basis van de technische documentatie.
                               );
                             })}
                           </div>
-                        ) : (
+                        );
+                      }
+                      
+                      // Layer 2: Parse text for PDF references as fallback
+                      const extractedPdfs = extractPdfReferencesFromText(msg.content);
+                      if (extractedPdfs.length > 0) {
+                        return (
                           <div className="mt-4 pt-4 border-t border-border/40">
-                            <div className="text-xs text-muted-foreground flex items-center gap-2">
-                              <span>ℹ️</span>
-                              <span className="italic">Dit antwoord is gebaseerd op de beschikbare technische documentatie</span>
-                            </div>
+                            <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen (uit tekst gedetecteerd):</div>
+                            {extractedPdfs.map((filename, idx) => {
+                              const { data } = supabase.storage.from("documents").getPublicUrl(filename);
+                              return (
+                                <div key={idx} className="text-xs text-muted-foreground mb-2">
+                                  <span className="font-medium">
+                                    • <button 
+                                      onClick={() => setPdfPreview({ url: data.publicUrl, filename })}
+                                      className="hover:underline hover:text-foreground transition-colors cursor-pointer"
+                                    >
+                                      {filename}
+                                    </button>
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
-                        )}
-                      </>
-                    )}
+                        );
+                      }
+                      
+                      // Layer 3: Generic fallback if no sources found
+                      return (
+                        <div className="mt-4 pt-4 border-t border-border/40">
+                          <div className="text-xs text-muted-foreground flex items-center gap-2">
+                            <span>ℹ️</span>
+                            <span className="italic">Dit antwoord is gebaseerd op de beschikbare technische documentatie</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </>
                 ) : (
                   <div className="flex items-center gap-2">
