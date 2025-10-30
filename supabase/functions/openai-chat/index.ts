@@ -35,6 +35,55 @@ function hashQuestion(question: string): string {
   return btoa(question.toLowerCase().trim()).replace(/[^a-zA-Z0-9]/g, '');
 }
 
+// Normalize OpenAI filename to match storage bucket naming
+function normalizeToStorageFilename(openAIFilename: string): string {
+  return openAIFilename
+    .trim()
+    .replace(/\s+/g, '_')                    // spaces → underscores
+    .replace(/\.(txt|json)$/i, '.pdf')       // .txt/.json → .pdf
+    .replace(/_+/g, '_')                     // multiple underscores → single
+    .replace(/[^a-zA-Z0-9._-]/g, '_');       // invalid characters → underscore
+}
+
+// Calculate similarity between two strings (0-1)
+function calculateSimilarity(str1: string, str2: string): number {
+  // Remove extensions for comparison
+  const name1 = str1.replace(/\.[^.]+$/, '').toLowerCase();
+  const name2 = str2.replace(/\.[^.]+$/, '').toLowerCase();
+  
+  // Simple similarity: count matching characters
+  const maxLength = Math.max(name1.length, name2.length);
+  if (maxLength === 0) return 0;
+  
+  let matches = 0;
+  for (let i = 0; i < Math.min(name1.length, name2.length); i++) {
+    if (name1[i] === name2[i]) matches++;
+  }
+  
+  return matches / maxLength;
+}
+
+// Find best matching filename from available files
+function findBestMatch(
+  targetName: string, 
+  availableFiles: string[]
+): { filename: string; score: number } | null {
+  let bestMatch = null;
+  let bestScore = 0;
+  
+  for (const file of availableFiles) {
+    const score = calculateSimilarity(targetName, file);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = file;
+    }
+  }
+  
+  return bestMatch && bestScore > 0.7 
+    ? { filename: bestMatch, score: bestScore }
+    : null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -493,6 +542,20 @@ serve(async (req) => {
             console.log('⚠️ No citations returned by OpenAI - fallback indicator will be shown');
           }
 
+          // Fetch all available PDFs from storage
+          const { data: storageFiles, error: storageError } = await supabase.storage
+            .from('documents')
+            .list();
+          
+          if (storageError) {
+            console.error('Error fetching storage files:', storageError);
+          }
+
+          const availablePdfs = storageFiles?.map(f => f.name).filter(name => name.endsWith('.pdf')) || [];
+          console.log('Available PDFs in storage:', availablePdfs.length);
+          console.log('Storage files:', availablePdfs);
+
+          // Validate citations against storage
           const citationsWithFilenames = await Promise.all(
             uniqueCitations.map(async (citation) => {
               try {
@@ -502,16 +565,53 @@ serve(async (req) => {
                   }
                 });
                 const fileData = await fileResponse.json();
-                return {
-                  ...citation,
-                  filename: fileData.filename || citation.file_id
-                };
+                const openAIFilename = fileData.filename || citation.file_id;
+                
+                console.log('Processing citation:', { 
+                  file_id: citation.file_id, 
+                  openAIFilename 
+                });
+
+                // Try exact match first (normalize to PDF)
+                const normalizedName = normalizeToStorageFilename(openAIFilename);
+                console.log('Normalized filename:', normalizedName);
+                
+                if (availablePdfs.includes(normalizedName)) {
+                  console.log('✅ Exact match found:', normalizedName);
+                  return {
+                    ...citation,
+                    filename: normalizedName
+                  };
+                }
+                
+                // Try fuzzy match
+                const fuzzyMatch = findBestMatch(normalizedName, availablePdfs);
+                
+                if (fuzzyMatch && fuzzyMatch.score > 0.7) {
+                  console.log(`✅ Fuzzy match found: ${normalizedName} → ${fuzzyMatch.filename} (score: ${fuzzyMatch.score.toFixed(2)})`);
+                  return {
+                    ...citation,
+                    filename: fuzzyMatch.filename
+                  };
+                }
+                
+                // No match found - log and exclude
+                console.log(`⚠️ No storage match for: ${openAIFilename} (normalized: ${normalizedName})`);
+                return null;
               } catch (error) {
                 console.error('Error fetching file metadata:', error);
-                return { ...citation, filename: citation.file_id };
+                return null;
               }
             })
           );
+
+          // Filter out null values (unmatched citations)
+          const validatedCitations = citationsWithFilenames.filter(c => c !== null);
+          
+          console.log('=== Citation Validation Results ===');
+          console.log('OpenAI citations:', uniqueCitations.length);
+          console.log('Validated citations:', validatedCitations.length);
+          console.log('Filtered out:', uniqueCitations.length - validatedCitations.length);
 
           // Cache the response
           if (fullText.length > 0) {
@@ -520,15 +620,15 @@ serve(async (req) => {
               question_hash: questionHash,
               question: trimmedMessage,
               answer: fullText,
-              citations: citationsWithFilenames
+              citations: validatedCitations
             });
           }
 
           // Send citations to client
-          if (citationsWithFilenames.length > 0) {
+          if (validatedCitations.length > 0) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
               type: 'citations', 
-              citations: citationsWithFilenames 
+              citations: validatedCitations 
             })}\n\n`));
           }
 
