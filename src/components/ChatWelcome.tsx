@@ -383,41 +383,52 @@ Beantwoord de vraag op basis van de technische documentatie.
                       ),
                     }}
                   />
-                    {msg.role === "assistant" && msg.citations && msg.citations.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-border/40">
-                        <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
-                      {msg.citations.map((citation, idx) => {
-                          // Normalize filename with consistent logic
-                          const filename = citation.filename || `Bron ${idx + 1}`;
-                          const pdfFilename = filename
-                            .trim()                          // First trim whitespace
-                            .replace(/\s+/g, '_')            // Replace spaces with underscores
-                            .replace(/\.txt$/i, '.pdf')      // Convert .txt to .pdf
-                            .replace(/_+/g, '_')             // Consolidate multiple underscores
-                            .replace(/_+\.pdf$/i, '.pdf');   // Remove trailing underscores before .pdf
-                          
-                          // Get public URL from storage
-                          const { data } = supabase.storage.from("documents").getPublicUrl(pdfFilename);
-                          const documentUrl = data.publicUrl;
-                          
-                          return (
-                            <div key={idx} className="text-xs text-muted-foreground mb-2">
-                              <span className="font-medium">
-                                 • <button 
-                                    onClick={() => setPdfPreview({
-                                      url: documentUrl,
-                                      filename: pdfFilename
-                                    })}
-                                    className="hover:underline hover:text-foreground transition-colors cursor-pointer"
-                                  >
-                                    {pdfFilename}
-                                  </button>
-                              </span>
-                              {citation.quote && <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>}
+                    {msg.role === "assistant" && (
+                      <>
+                        {msg.citations && msg.citations.length > 0 ? (
+                          <div className="mt-4 pt-4 border-t border-border/40">
+                            <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
+                            {msg.citations.map((citation, idx) => {
+                              // Normalize filename with consistent logic
+                              const filename = citation.filename || `Bron ${idx + 1}`;
+                              const pdfFilename = filename
+                                .trim()                          // First trim whitespace
+                                .replace(/\s+/g, '_')            // Replace spaces with underscores
+                                .replace(/\.txt$/i, '.pdf')      // Convert .txt to .pdf
+                                .replace(/_+/g, '_')             // Consolidate multiple underscores
+                                .replace(/_+\.pdf$/i, '.pdf');   // Remove trailing underscores before .pdf
+                              
+                              // Get public URL from storage
+                              const { data } = supabase.storage.from("documents").getPublicUrl(pdfFilename);
+                              const documentUrl = data.publicUrl;
+                              
+                              return (
+                                <div key={idx} className="text-xs text-muted-foreground mb-2">
+                                  <span className="font-medium">
+                                     • <button 
+                                        onClick={() => setPdfPreview({
+                                          url: documentUrl,
+                                          filename: pdfFilename
+                                        })}
+                                        className="hover:underline hover:text-foreground transition-colors cursor-pointer"
+                                      >
+                                        {pdfFilename}
+                                      </button>
+                                  </span>
+                                  {citation.quote && <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="mt-4 pt-4 border-t border-border/40">
+                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                              <span>ℹ️</span>
+                              <span className="italic">Dit antwoord is gebaseerd op de beschikbare technische documentatie</span>
                             </div>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </>
                 ) : (

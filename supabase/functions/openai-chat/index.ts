@@ -231,7 +231,7 @@ serve(async (req) => {
       body: JSON.stringify({
         assistant_id: ASSISTANT_ID,
         stream: true,
-        additional_instructions: "Belangrijk: Geef je antwoord ALTIJD in het Nederlands, ongeacht de taal waarin de vraag wordt gesteld.",
+        additional_instructions: "Belangrijk: Geef je antwoord ALTIJD in het Nederlands, ongeacht de taal waarin de vraag wordt gesteld. Vermeld ALTIJD aan het einde van je antwoord uit welke specifieke document(en) je de informatie hebt gehaald. Gebruik het formaat: 'Bron: [documentnaam].pdf'",
         tool_resources: {
           file_search: {
             vector_store_ids: [VECTOR_STORE_ID]
@@ -486,7 +486,12 @@ serve(async (req) => {
             new Map(citations.map(c => [c.file_id, c])).values()
           );
           
-          console.log('Processing', uniqueCitations.length, 'unique citations');
+          console.log('=== Citations Processing ===');
+          console.log('Total citations found:', citations.length);
+          console.log('Unique citations:', uniqueCitations.length);
+          if (uniqueCitations.length === 0) {
+            console.log('⚠️ No citations returned by OpenAI - fallback indicator will be shown');
+          }
 
           const citationsWithFilenames = await Promise.all(
             uniqueCitations.map(async (citation) => {
