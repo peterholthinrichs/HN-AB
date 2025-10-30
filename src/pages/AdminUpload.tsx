@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Upload, CheckCircle, XCircle, Loader2, FileText, X, Trash2, RefreshCw } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, Loader2, FileText, X, Trash2, RefreshCw, Home } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { Link } from 'react-router-dom';
 import { PdfPreviewDialog } from '@/components/PdfPreviewDialog';
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error';
@@ -270,10 +271,20 @@ export default function AdminUpload() {
       <div className="max-w-4xl mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>PDF Upload naar Storage</CardTitle>
-            <CardDescription>
-              Selecteer PDF bestanden om te uploaden naar de storage bucket. Deze zullen beschikbaar zijn voor bronvermelding.
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>PDF Upload naar Storage</CardTitle>
+                <CardDescription>
+                  Selecteer PDF bestanden om te uploaden naar de storage bucket. Deze zullen beschikbaar zijn voor bronvermelding.
+                </CardDescription>
+              </div>
+              <Link to="/">
+                <Button variant="outline" size="sm">
+                  <Home className="mr-2 h-4 w-4" />
+                  Terug naar Chat
+                </Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* File Input */}
