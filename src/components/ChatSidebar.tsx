@@ -21,7 +21,8 @@ interface Colleague {
 
 const colleagues: Colleague[] = [
   { id: "1", name: "Engineer", role: "Holiday ICE", avatar: engineerAvatar },
- 
+];
+
 interface ChatSidebarProps {
   selectedColleague: string | null;
   onSelectColleague: (id: string) => void;
