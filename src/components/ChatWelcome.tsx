@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Message, ChatSession } from "@/types/chat";
 import { PdfPreviewDialog } from "@/components/PdfPreviewDialog";
 import { getAuthToken } from "@/lib/auth";
-import DOMPurify from 'dompurify';
+import DOMPurify from "dompurify";
 import { supabase } from "@/integrations/supabase/client";
 import { FunnelState, DEFAULT_FUNNEL } from "@/types/funnel";
 
@@ -64,82 +64,85 @@ export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProp
   // Extract PDF references from text content as fallback
   const extractPdfReferencesFromText = (content: string): string[] => {
     const patterns = [
-      /Bron:\s*([^\s,\n]+\.pdf)/gi,           // "Bron: filename.pdf"
-      /Bron:\s*([^\s,\n]+\.txt)/gi,           // "Bron: filename.txt"
-      /Bron:\s*([^\s,\n]+\.json)/gi,          // "Bron: filename.json"
-      /\b([A-Z][a-zA-Z0-9_-]+\.pdf)\b/g,      // Any filename.pdf pattern
+      /Bron:\s*([^\s,\n]+\.pdf)/gi, // "Bron: filename.pdf"
+      /Bron:\s*([^\s,\n]+\.txt)/gi, // "Bron: filename.txt"
+      /Bron:\s*([^\s,\n]+\.json)/gi, // "Bron: filename.json"
+      /\b([A-Z][a-zA-Z0-9_-]+\.pdf)\b/g, // Any filename.pdf pattern
     ];
-    
+
     const matches: string[] = [];
-    patterns.forEach(pattern => {
+    patterns.forEach((pattern) => {
       const found = content.matchAll(pattern);
       for (const match of found) {
         if (match[1]) {
           // Normalize to PDF format
-          const normalized = match[1]
-            .replace(/\.(json|txt)$/i, '.pdf')
-            .replace(/\s+/g, '_');
+          const normalized = match[1].replace(/\.(json|txt)$/i, ".pdf").replace(/\s+/g, "_");
           matches.push(normalized);
         }
       }
     });
-    
+
     return [...new Set(matches)]; // Remove duplicates
   };
 
   const handleFunnelResponse = (userAnswer: string) => {
     if (!funnelState) return;
-    
+
     const currentQ = funnelState.questions[funnelState.currentStep];
-    
+
     // Opslaan antwoord
     const newData = {
       ...funnelState.collectedData,
-      [currentQ.id]: userAnswer
+      [currentQ.id]: userAnswer,
     };
-    
+
     const nextStep = funnelState.currentStep + 1;
     const isLastQuestion = nextStep >= funnelState.questions.length;
-    
+
     if (isLastQuestion) {
       // LAATSTE VRAAG → verstuur naar AI
       const compiledPrompt = `
 De gebruiker heeft de volgende informatie gegeven:
 
-Oorspronkelijke vraag: ${newData.initial_question || 'Geen'}
+Oorspronkelijke vraag: ${newData.initial_question || "Geen"}
 Component type: ${newData.component_type}
 Typenummer: ${newData.type_number}
 Details: ${newData.details}
 
 Beantwoord de vraag op basis van de technische documentatie.
       `.trim();
-      
+
       // Sluit funnel af
       setFunnelState(null);
-      
+
       // Voeg loading message toe
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: ""
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "",
+        },
+      ]);
       setIsLoading(true);
-      
+
       // Verstuur naar AI
       streamResponse(compiledPrompt).finally(() => setIsLoading(false));
-      
     } else {
       // VOLGENDE VRAAG
       const nextQ = funnelState.questions[nextStep];
-      
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: nextQ.question
-      }]);
-      
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: nextQ.question,
+        },
+      ]);
+
       setFunnelState({
         ...funnelState,
         currentStep: nextStep,
-        collectedData: newData
+        collectedData: newData,
       });
     }
   };
@@ -147,7 +150,7 @@ Beantwoord de vraag op basis van de technische documentatie.
   const streamResponse = async (userMessage: string): Promise<void> => {
     const token = getAuthToken();
     if (!token) {
-      throw new Error('Niet geauthenticeerd');
+      throw new Error("Niet geauthenticeerd");
     }
 
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
@@ -155,7 +158,7 @@ Beantwoord de vraag op basis van de technische documentatie.
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
-        "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       },
       body: JSON.stringify({
         message: userMessage,
@@ -166,15 +169,15 @@ Beantwoord de vraag op basis van de technische documentatie.
     if (!response.ok) {
       if (response.status === 401) {
         // Authentication failed - redirect to login
-        localStorage.removeItem('auth_token');
-        window.location.href = '/login';
-        throw new Error('Sessie verlopen, log opnieuw in');
+        localStorage.removeItem("auth_token");
+        window.location.href = "/login";
+        throw new Error("Sessie verlopen, log opnieuw in");
       }
       if (response.status === 429) {
-        throw new Error('Te veel verzoeken, probeer het later opnieuw');
+        throw new Error("Te veel verzoeken, probeer het later opnieuw");
       }
       if (response.status === 402) {
-        throw new Error('Betaling vereist, voeg fondsen toe aan je account');
+        throw new Error("Betaling vereist, voeg fondsen toe aan je account");
       }
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
@@ -182,11 +185,11 @@ Beantwoord de vraag op basis van de technische documentatie.
 
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
-    let streamedText = '';
+    let buffer = "";
+    let streamedText = "";
 
     if (!reader) {
-      throw new Error('No response body');
+      throw new Error("No response body");
     }
 
     while (true) {
@@ -194,21 +197,21 @@ Beantwoord de vraag op basis van de technische documentatie.
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
+        if (line.startsWith("data: ")) {
           const data = line.slice(6).trim();
-          if (data === '[DONE]') {
+          if (data === "[DONE]") {
             // Check if we received any content
             if (!streamedText.trim()) {
               // No answer received
               setMessages((prev) => {
                 const newMessages = [...prev];
                 newMessages[newMessages.length - 1] = {
-                  role: 'assistant',
-                  content: 'Geen antwoord ontvangen, probeer het opnieuw.'
+                  role: "assistant",
+                  content: "Geen antwoord ontvangen, probeer het opnieuw.",
                 };
                 return newMessages;
               });
@@ -225,32 +228,32 @@ Beantwoord de vraag op basis van de technische documentatie.
           try {
             const parsed = JSON.parse(data);
 
-            if (parsed.type === 'thread' && parsed.threadId) {
+            if (parsed.type === "thread" && parsed.threadId) {
               setThreadId(parsed.threadId);
-            } else if (parsed.type === 'token' && parsed.content) {
+            } else if (parsed.type === "token" && parsed.content) {
               streamedText += parsed.content;
               // Update the last message with accumulated text
               setMessages((prev) => {
                 const newMessages = [...prev];
                 newMessages[newMessages.length - 1] = {
-                  role: 'assistant',
-                  content: streamedText
+                  role: "assistant",
+                  content: streamedText,
                 };
                 return newMessages;
               });
-            } else if (parsed.type === 'citations' && parsed.citations) {
+            } else if (parsed.type === "citations" && parsed.citations) {
               // Add citations to the last message
               setMessages((prev) => {
                 const newMessages = [...prev];
                 newMessages[newMessages.length - 1] = {
                   ...newMessages[newMessages.length - 1],
-                  citations: parsed.citations
+                  citations: parsed.citations,
                 };
                 return newMessages;
               });
             }
           } catch (e) {
-            console.error('Error parsing SSE:', e);
+            console.error("Error parsing SSE:", e);
           }
         }
       }
@@ -259,9 +262,9 @@ Beantwoord de vraag op basis van de technische documentatie.
 
   const handleSend = async () => {
     const trimmedMessage = message.trim();
-    
+
     if (!trimmedMessage || isLoading) return;
-    
+
     // Validate message length
     const MAX_MESSAGE_LENGTH = 2000;
     if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
@@ -274,32 +277,35 @@ Beantwoord de vraag op basis van de technische documentatie.
     }
 
     setMessage("");
-    
+
     // Als er nog geen messages zijn EN funnel is niet actief → start funnel
     if (messages.length === 0 && !funnelState) {
       // Voeg user message toe
       setMessages([{ role: "user", content: trimmedMessage }]);
-      
+
       // Start funnel met eerste vraag
       setFunnelState({
         isActive: true,
         currentStep: 0,
         collectedData: {
-          initial_question: trimmedMessage
+          initial_question: trimmedMessage,
         },
-        questions: DEFAULT_FUNNEL
+        questions: DEFAULT_FUNNEL,
       });
-      
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: DEFAULT_FUNNEL[0].question
-      }]);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: DEFAULT_FUNNEL[0].question,
+        },
+      ]);
       return;
     }
-    
+
     // Als funnel actief is → verwerk funnel antwoord
     if (funnelState?.isActive) {
-      setMessages(prev => [...prev, { role: "user", content: trimmedMessage }]);
+      setMessages((prev) => [...prev, { role: "user", content: trimmedMessage }]);
       handleFunnelResponse(trimmedMessage);
       return;
     }
@@ -345,9 +351,9 @@ Beantwoord de vraag op basis van de technische documentatie.
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder={
-                funnelState?.isActive 
+                funnelState?.isActive
                   ? funnelState.questions[funnelState.currentStep].placeholder || "Type je antwoord..."
-                  : "Wat voor werkzaamheden zijn verricht voor Holiday Ice?"
+                  : "Heb je een vraag voor componenten, verdampers, compressoren, gaskoelers of condensors?"
               }
               className="w-full px-6 py-4 pr-14 rounded-2xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-sm"
               disabled={isLoading}
@@ -400,91 +406,101 @@ Beantwoord de vraag op basis van de technische documentatie.
               >
                 {msg.content ? (
                   <>
-                  <div
-                    className="text-sm whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{
-                      __html: DOMPurify.sanitize(
-                        msg.content.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"),
-                        { ALLOWED_TAGS: ['strong', 'em', 'br', 'p', 'ul', 'ol', 'li'] }
-                      ),
-                    }}
-                  />
-                    {msg.role === "assistant" && (() => {
-                      // Layer 1: Use OpenAI citations if available
-                      if (msg.citations && msg.citations.length > 0) {
-                        return (
-                          <div className="mt-4 pt-4 border-t border-border/40">
-                            <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
-                            {msg.citations.map((citation, idx) => {
-                              // Normalize filename with consistent logic
-                              const filename = citation.filename || `Bron ${idx + 1}`;
-                              const pdfFilename = filename
-                                .trim()                          // First trim whitespace
-                                .replace(/\s+/g, '_')            // Replace spaces with underscores
-                                .replace(/\.txt$/i, '.pdf')      // Convert .txt to .pdf
-                                .replace(/_+/g, '_')             // Consolidate multiple underscores
-                                .replace(/_+\.pdf$/i, '.pdf');   // Remove trailing underscores before .pdf
-                              
-                              // Get public URL from storage
-                              const { data } = supabase.storage.from("documents").getPublicUrl(pdfFilename);
-                              const documentUrl = data.publicUrl;
-                              
-                              return (
-                                <div key={idx} className="text-xs text-muted-foreground mb-2">
-                                  <span className="font-medium">
-                                     • <button 
-                                        onClick={() => setPdfPreview({
-                                          url: documentUrl,
-                                          filename: pdfFilename
-                                        })}
+                    <div
+                      className="text-sm whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(msg.content.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"), {
+                          ALLOWED_TAGS: ["strong", "em", "br", "p", "ul", "ol", "li"],
+                        }),
+                      }}
+                    />
+                    {msg.role === "assistant" &&
+                      (() => {
+                        // Layer 1: Use OpenAI citations if available
+                        if (msg.citations && msg.citations.length > 0) {
+                          return (
+                            <div className="mt-4 pt-4 border-t border-border/40">
+                              <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen:</div>
+                              {msg.citations.map((citation, idx) => {
+                                // Normalize filename with consistent logic
+                                const filename = citation.filename || `Bron ${idx + 1}`;
+                                const pdfFilename = filename
+                                  .trim() // First trim whitespace
+                                  .replace(/\s+/g, "_") // Replace spaces with underscores
+                                  .replace(/\.txt$/i, ".pdf") // Convert .txt to .pdf
+                                  .replace(/_+/g, "_") // Consolidate multiple underscores
+                                  .replace(/_+\.pdf$/i, ".pdf"); // Remove trailing underscores before .pdf
+
+                                // Get public URL from storage
+                                const { data } = supabase.storage.from("documents").getPublicUrl(pdfFilename);
+                                const documentUrl = data.publicUrl;
+
+                                return (
+                                  <div key={idx} className="text-xs text-muted-foreground mb-2">
+                                    <span className="font-medium">
+                                      •{" "}
+                                      <button
+                                        onClick={() =>
+                                          setPdfPreview({
+                                            url: documentUrl,
+                                            filename: pdfFilename,
+                                          })
+                                        }
                                         className="hover:underline hover:text-foreground transition-colors cursor-pointer"
                                       >
                                         {pdfFilename}
                                       </button>
-                                  </span>
-                                  {citation.quote && <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      }
-                      
-                      // Layer 2: Parse text for PDF references as fallback
-                      const extractedPdfs = extractPdfReferencesFromText(msg.content);
-                      if (extractedPdfs.length > 0) {
+                                    </span>
+                                    {citation.quote && (
+                                      <div className="ml-3 mt-1 italic opacity-80">"{citation.quote}"</div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        }
+
+                        // Layer 2: Parse text for PDF references as fallback
+                        const extractedPdfs = extractPdfReferencesFromText(msg.content);
+                        if (extractedPdfs.length > 0) {
+                          return (
+                            <div className="mt-4 pt-4 border-t border-border/40">
+                              <div className="text-xs font-semibold text-muted-foreground mb-2">
+                                Bronnen (uit tekst gedetecteerd):
+                              </div>
+                              {extractedPdfs.map((filename, idx) => {
+                                const { data } = supabase.storage.from("documents").getPublicUrl(filename);
+                                return (
+                                  <div key={idx} className="text-xs text-muted-foreground mb-2">
+                                    <span className="font-medium">
+                                      •{" "}
+                                      <button
+                                        onClick={() => setPdfPreview({ url: data.publicUrl, filename })}
+                                        className="hover:underline hover:text-foreground transition-colors cursor-pointer"
+                                      >
+                                        {filename}
+                                      </button>
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        }
+
+                        // Layer 3: Generic fallback if no sources found
                         return (
                           <div className="mt-4 pt-4 border-t border-border/40">
-                            <div className="text-xs font-semibold text-muted-foreground mb-2">Bronnen (uit tekst gedetecteerd):</div>
-                            {extractedPdfs.map((filename, idx) => {
-                              const { data } = supabase.storage.from("documents").getPublicUrl(filename);
-                              return (
-                                <div key={idx} className="text-xs text-muted-foreground mb-2">
-                                  <span className="font-medium">
-                                    • <button 
-                                      onClick={() => setPdfPreview({ url: data.publicUrl, filename })}
-                                      className="hover:underline hover:text-foreground transition-colors cursor-pointer"
-                                    >
-                                      {filename}
-                                    </button>
-                                  </span>
-                                </div>
-                              );
-                            })}
+                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                              <span>ℹ️</span>
+                              <span className="italic">
+                                Dit antwoord is gebaseerd op de beschikbare technische documentatie
+                              </span>
+                            </div>
                           </div>
                         );
-                      }
-                      
-                      // Layer 3: Generic fallback if no sources found
-                      return (
-                        <div className="mt-4 pt-4 border-t border-border/40">
-                          <div className="text-xs text-muted-foreground flex items-center gap-2">
-                            <span>ℹ️</span>
-                            <span className="italic">Dit antwoord is gebaseerd op de beschikbare technische documentatie</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
+                      })()}
                   </>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -508,7 +524,7 @@ Beantwoord de vraag op basis van de technische documentatie.
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
               placeholder={
-                funnelState?.isActive 
+                funnelState?.isActive
                   ? funnelState.questions[funnelState.currentStep].placeholder || "Type je antwoord..."
                   : "Typ je bericht hier..."
               }
@@ -530,8 +546,8 @@ Beantwoord de vraag op basis van de technische documentatie.
       <PdfPreviewDialog
         open={!!pdfPreview}
         onOpenChange={(open) => !open && setPdfPreview(null)}
-        pdfUrl={pdfPreview?.url || ''}
-        filename={pdfPreview?.filename || ''}
+        pdfUrl={pdfPreview?.url || ""}
+        filename={pdfPreview?.filename || ""}
       />
     </div>
   );
