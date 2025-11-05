@@ -14,7 +14,7 @@ export interface FunnelState {
 export const DEFAULT_FUNNEL: FunnelQuestion[] = [
   {
     id: "component_type",
-    question: "Heb je een vraag voor componenten, verdampers, compressoren, gaskoelers of condensors?",
+    question: "Heb je een vraag over componenten, verdampers, compressoren, gaskoelers of condensors?",
     placeholder: "Bijv. verdampers"
   },
   {
