@@ -353,7 +353,7 @@ Beantwoord de vraag op basis van de technische documentatie.
               placeholder={
                 funnelState?.isActive
                   ? funnelState.questions[funnelState.currentStep].placeholder || "Type je antwoord..."
-                  : "Heb je een vraag voor componenten, verdampers, compressoren, gaskoelers of condensors?"
+                  : "Heb je een over voor componenten, verdampers, compressoren, gaskoelers of condensors?"
               }
               className="w-full px-6 py-4 pr-14 rounded-2xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-sm"
               disabled={isLoading}
