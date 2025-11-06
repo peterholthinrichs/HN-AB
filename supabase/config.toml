@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.admin-upload]
 verify_jwt = false
+
+[functions.admin-delete]
+verify_jwt = false

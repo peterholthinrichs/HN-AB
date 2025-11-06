@@ -232,22 +232,41 @@ export default function AdminUpload() {
   };
 
   const deleteFiles = async (filenames: string[]) => {
+    if (filenames.length === 0) return;
+
+    const authToken = localStorage.getItem('auth_token');
+    if (!authToken) {
+      toast.error('Niet ingelogd');
+      return;
+    }
+
     setIsDeleting(true);
     try {
-      const { error } = await supabase
-        .storage
-        .from('documents')
-        .remove(filenames);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-delete`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ filenames }),
+        }
+      );
 
-      if (error) throw error;
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Kon bestanden niet verwijderen');
+      }
 
       toast.success(`${filenames.length} bestand${filenames.length !== 1 ? 'en' : ''} verwijderd`);
-      
+
       await fetchExistingFiles();
       setSelectedForDelete(new Set());
     } catch (error) {
       console.error('Error deleting files:', error);
-      toast.error('Kon bestanden niet verwijderen');
+      toast.error(error instanceof Error ? error.message : 'Kon bestanden niet verwijderen');
     } finally {
       setIsDeleting(false);
     }
