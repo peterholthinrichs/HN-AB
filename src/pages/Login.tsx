@@ -77,7 +77,7 @@ const Login = () => {
       <div className="w-full max-w-md space-y-8">
         <div className="flex flex-col items-center">
           <div className="w-20 h-20 mb-6">
-            <img src={logo} alt="POOL techniek logo" className="w-full h-full object-contain" />
+            <img src={logo} alt="HN-AB logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">Inloggen</h1>
           <p className="text-muted-foreground mt-2">Vul je gegevens in om door te gaan</p>
@@ -125,7 +125,7 @@ const Login = () => {
         </form>
 
         <div className="text-center text-sm text-muted-foreground">
-          <p>POOL techniek © {new Date().getFullYear()}</p>
+          <p>HN-AB © {new Date().getFullYear()}</p>
         </div>
       </div>
     </div>

@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import claireAvatar from "@/assets/claire.jpg";
 import tomAvatar from "@/assets/tom.jpg";
 import remcoAvatar from "@/assets/remco.jpg";
-import poolLogo from "@/assets/pool-logo.png";
+import poolLogo from "/hn-ab-logo.svg";
 import uploadIcon from "@/assets/upload-icon.png";
 import { ChatSession } from "@/types/chat";
 
@@ -159,10 +159,10 @@ export const ChatSidebar = ({
       {/* Footer Branding */}
       <div className="p-4 border-t border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center">
-            <img src={poolLogo} alt="POOL techniek logo" className="w-full h-full object-contain" />
+          <div className="w-14 h-14 rounded-lg overflow-hidden flex items-center justify-center bg-white">
+            <img src={poolLogo} alt="HN-AB logo" className="w-full h-full object-contain" />
           </div>
-          <span className="font-medium text-foreground text-sm">POOL techniek</span>
+          <span className="font-medium text-foreground text-sm">HN-AB</span>
           <Link to="/admin/upload" className="ml-auto">
             <img src={uploadIcon} alt="Upload" className="w-6 h-6 object-contain hover:opacity-70 transition-opacity cursor-pointer" />
           </Link>

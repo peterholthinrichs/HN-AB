@@ -338,7 +338,7 @@ Beantwoord de vraag op basis van de technische documentatie.
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-4xl mx-auto w-full">
         <div className="w-16 h-16 flex items-center justify-center mb-6">
-          <img src={logo} alt="POOL techniek logo" className="w-full h-full object-contain" />
+          <img src={logo} alt="HN-AB logo" className="w-full h-full object-contain" />
         </div>
 
         <h1 className="text-3xl font-semibold text-foreground mb-12">Waar kan ik je mee helpen?</h1>
