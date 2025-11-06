@@ -186,6 +186,7 @@ const Index = () => {
           selectedColleague={selectedColleague}
           assistantMap={colleagueAssistantMap}
           colleagueNames={COLLEAGUE_NAMES}
+          colleagueDirectory={colleagues}
         />
       </main>
     </div>

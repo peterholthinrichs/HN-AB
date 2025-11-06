@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { MessageSquare, ArrowUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
@@ -52,12 +52,128 @@ export const ChatWelcome = ({
   } | null>(null);
   const [funnelState, setFunnelState] = useState<FunnelState | null>(null);
   const { toast } = useToast();
-  const inputRef = useRef<HTMLInputElement>(null);
+ const inputRef = useRef<HTMLInputElement | null>(null);
+ const assignInputRef = (element: HTMLInputElement | null) => {
+   inputRef.current = element;
+ };
 
   const [isMentionOpen, setIsMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [highlightIndex, setHighlightIndex] = useState(0);
+
+ const closeMentionMenu = () => {
+   setIsMentionOpen(false);
+   setMentionQuery("");
+   setMentionStart(null);
+   setHighlightIndex(0);
+ };
+
+ const mentionCandidates = useMemo(() => {
+   return colleagueDirectory.filter((colleague) => colleague.id !== selectedColleague);
+ }, [colleagueDirectory, selectedColleague]);
+
+ const filteredMentions = useMemo(() => {
+   if (!isMentionOpen) return mentionCandidates;
+   if (!mentionQuery) return mentionCandidates;
+   const query = mentionQuery.toLowerCase();
+   return mentionCandidates.filter(
+     (colleague) =>
+       colleague.name.toLowerCase().includes(query) ||
+       colleague.id.toLowerCase().includes(query)
+   );
+ }, [isMentionOpen, mentionCandidates, mentionQuery]);
+
+ useEffect(() => {
+   if (highlightIndex >= filteredMentions.length) {
+     setHighlightIndex(0);
+   }
+ }, [filteredMentions.length, highlightIndex]);
+
+ const detectMentionAtCaret = (value: string, caretPosition: number) => {
+   const slice = value.slice(0, caretPosition);
+   const match = slice.match(/(^|\s)@([a-zA-Z0-9_-]*)$/);
+   if (!match) return null;
+   const query = match[2];
+   const start = caretPosition - query.length - 1;
+   return { query, start };
+ };
+
+ const handleMessageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+   const { value, selectionStart } = event.target;
+   setMessage(value);
+
+   const caret = selectionStart ?? value.length;
+   const mentionInfo = detectMentionAtCaret(value, caret);
+
+   if (mentionInfo) {
+     setIsMentionOpen(true);
+     setMentionQuery(mentionInfo.query.toLowerCase());
+     setMentionStart(mentionInfo.start);
+     setHighlightIndex(0);
+   } else {
+     if (isMentionOpen) {
+       closeMentionMenu();
+     }
+   }
+ };
+
+ const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+   if (isMentionOpen && filteredMentions.length > 0) {
+     if (event.key === "ArrowDown") {
+       event.preventDefault();
+       setHighlightIndex((prev) => (prev + 1) % filteredMentions.length);
+       return;
+     }
+     if (event.key === "ArrowUp") {
+       event.preventDefault();
+       setHighlightIndex((prev) => (prev - 1 + filteredMentions.length) % filteredMentions.length);
+       return;
+     }
+     if (event.key === "Enter" || event.key === "Tab") {
+       event.preventDefault();
+       const colleague = filteredMentions[highlightIndex];
+       if (colleague) {
+         handleMentionSelect(colleague);
+       }
+       return;
+     }
+     if (event.key === "Escape") {
+       event.preventDefault();
+       closeMentionMenu();
+       return;
+     }
+   }
+
+   if (event.key === "Escape" && isMentionOpen) {
+     closeMentionMenu();
+   }
+ };
+
+ const handleMentionSelect = (colleague: MentionCandidate) => {
+   if (mentionStart == null) return;
+
+   const before = message.slice(0, mentionStart);
+   const after = message.slice(mentionStart + mentionQuery.length + 1);
+   const insert = `@${colleague.id} `;
+
+   const newValue = `${before}${insert}${after}`;
+   setMessage(newValue);
+   closeMentionMenu();
+
+   requestAnimationFrame(() => {
+     const caretPosition = before.length + insert.length;
+     inputRef.current?.focus();
+     inputRef.current?.setSelectionRange(caretPosition, caretPosition);
+   });
+ };
+
+ const handleInputBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+   const related = event.relatedTarget as HTMLElement | null;
+   if (!related || related.dataset.mentionOption !== "true") {
+     closeMentionMenu();
+   }
+ };
 
   // Update session when messages or threadId change
   useEffect(() => {
@@ -433,11 +549,12 @@ Beantwoord de vraag op basis van de technische documentatie.
         <div className="w-full max-w-2xl mb-8">
           <div className="relative">
             <input
-              ref={inputRef}
+              ref={assignInputRef}
               type="text"
               value={message}
               onChange={(e) => handleMessageChange(e)}
               onKeyDown={(e) => handleInputKeyDown(e)}
+              onBlur={handleInputBlur}
               placeholder={
                 funnelState?.isActive
                   ? funnelState.questions[funnelState.currentStep].placeholder || "Type je antwoord..."
@@ -456,6 +573,7 @@ Beantwoord de vraag op basis van de technische documentatie.
                       e.preventDefault();
                       handleMentionSelect(colleague);
                     }}
+                    data-mention-option="true"
                     className={cn(
                       "flex items-center gap-3 w-full px-3 py-2 text-sm",
                       idx === highlightIndex ? "bg-muted" : "hover:bg-muted/60"
@@ -633,10 +751,12 @@ Beantwoord de vraag op basis van de technische documentatie.
         <div className="max-w-4xl mx-auto">
           <div className="relative">
             <input
+              ref={assignInputRef}
               type="text"
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onChange={(e) => handleMessageChange(e)}
+              onKeyDown={(e) => handleInputKeyDown(e)}
+              onBlur={handleInputBlur}
               placeholder={
                 funnelState?.isActive
                   ? funnelState.questions[funnelState.currentStep].placeholder || "Type je antwoord..."
@@ -645,6 +765,33 @@ Beantwoord de vraag op basis van de technische documentatie.
               disabled={isLoading}
               className="w-full px-6 py-4 pr-14 rounded-2xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-sm"
             />
+            {isMentionOpen && filteredMentions.length > 0 && (
+              <div className="absolute left-6 right-6 bottom-[calc(100%+0.5rem)] z-50 rounded-2xl border border-border bg-card shadow-lg overflow-hidden">
+                {filteredMentions.map((colleague, idx) => (
+                  <button
+                    key={colleague.id}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleMentionSelect(colleague);
+                    }}
+                    data-mention-option="true"
+                    className={cn(
+                      "flex items-center gap-3 w-full px-3 py-2 text-sm",
+                      idx === highlightIndex ? "bg-muted" : "hover:bg-muted/60"
+                    )}
+                  >
+                    <img
+                      src={colleague.avatar}
+                      alt={colleague.name}
+                      className="w-6 h-6 rounded-full object-cover"
+                    />
+                    <span>{colleague.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">@{colleague.id}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <Button
               size="icon"
               onClick={handleSend}
