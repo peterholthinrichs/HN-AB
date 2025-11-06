@@ -11,9 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { FunnelState, DEFAULT_FUNNEL } from "@/types/funnel";
 
 const suggestions = [
-  "Hoe verloopt de beoordelingsprocedure van de aanbesteding volgens het vraagdocument, en welke criteria worden gehanteerd bij de gunning?",
-  "Hoe regelt de AK-PC 782A de condensatiedruk tijdens de transkritische en subkritische fasen bij actieve warmteterugwinning?",
-  "Hoe werkt de RTK ELECTRISCHE AANDRIJVING RE-ACT 30E/DC?",
+  "Stel een feitelijke, empathische terugkoppeling op voor een 2-spoortraject.",
+  "Beschrijf hoe divisies elkaar kunnen versterken met voorbeelden.",
+  "Schrijf een gespreksverslag in dezelfde stijl als het voorbeeld, met focus op observaties en afspraken.",
 ];
 
 interface ChatWelcomeProps {
