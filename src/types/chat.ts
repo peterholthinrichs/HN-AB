@@ -9,6 +9,7 @@ export interface ChatSession {
   title: string;
   messages: Message[];
   threadId: string | null;
+  colleagueId: string | null;
   createdAt: number;
   lastMessageAt: number;
 }

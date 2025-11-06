@@ -1,15 +1,20 @@
 import { useState, useEffect } from "react";
-import { ChatSidebar } from "@/components/ChatSidebar";
+import { ChatSidebar, colleagues } from "@/components/ChatSidebar";
 import { ChatWelcome } from "@/components/ChatWelcome";
 import { ChatSession, Message } from "@/types/chat";
 
 const STORAGE_KEY = "engineer-chat-sessions";
+const COLLEAGUE_NAMES: Record<string, string> = Object.fromEntries(
+  colleagues.map((colleague) => [colleague.id, colleague.name])
+);
 
 const Index = () => {
-  const [selectedColleague, setSelectedColleague] = useState<string | null>("claire");
+  const defaultColleague = colleagues[0]?.id ?? null;
+  const [selectedColleague, setSelectedColleague] = useState<string | null>(
+    defaultColleague
+  );
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Load sessions from localStorage on mount
   useEffect(() => {
@@ -17,29 +22,39 @@ const Index = () => {
     if (stored) {
       try {
         const data = JSON.parse(stored);
-        setChatSessions(data.sessions || []);
-        setActiveChatId(data.lastActive || null);
+        const sessions: ChatSession[] = (data.sessions || []).map((session: any) => ({
+          ...session,
+          colleagueId: session.colleagueId ?? null,
+        }));
+
+        setChatSessions(sessions);
+
+        const lastActiveId = data.lastActive || sessions[0]?.id || null;
+        setActiveChatId(lastActiveId);
+
+        const lastActiveSession = sessions.find((session) => session.id === lastActiveId);
+        if (lastActiveSession?.colleagueId) {
+          setSelectedColleague(lastActiveSession.colleagueId);
+        }
       } catch (error) {
         console.error("Failed to load chat sessions:", error);
       }
-    }
-    
-    // If no active chat after loading, create initial empty session
-    if (!stored || !localStorage.getItem(STORAGE_KEY)) {
+    } else {
       const initialSession: ChatSession = {
         id: `chat-${Date.now()}`,
-        title: "Nieuwe chat",
+        title: defaultColleague
+          ? `Nieuwe chat met ${COLLEAGUE_NAMES[defaultColleague] ?? defaultColleague}`
+          : "Nieuwe chat",
         messages: [],
         threadId: null,
+        colleagueId: defaultColleague,
         createdAt: Date.now(),
         lastMessageAt: Date.now(),
       };
       setChatSessions([initialSession]);
       setActiveChatId(initialSession.id);
     }
-    
-    setIsInitialized(true);
-  }, []);
+  }, [defaultColleague]);
 
   // Save sessions to localStorage whenever they change
   useEffect(() => {
@@ -54,33 +69,36 @@ const Index = () => {
     }
   }, [chatSessions, activeChatId]);
 
-  const handleNewChat = () => {
-    // Get the current session (might have unsaved messages)
-    const currentSessionData = chatSessions.find((s) => s.id === activeChatId);
-    
-    // If current session exists and has messages, ensure it's saved
-    if (currentSessionData && currentSessionData.messages.length > 0) {
-      // Session is already in chatSessions, it will be automatically saved via useEffect
-      // No action needed here
-    } else if (activeChatId) {
-      // There might be an active chat ID but no session saved yet
-      // This happens when the first message is sent but session hasn't been created yet
-      // The handleSessionUpdate will handle this, so we just need to make sure
-      // we're not creating a duplicate
+  const handleNewChat = (colleagueId: string | null = selectedColleague) => {
+    if (colleagueId) {
+      setSelectedColleague(colleagueId);
     }
 
-    // Create new chat session
     const newSession: ChatSession = {
       id: `chat-${Date.now()}`,
-      title: "Nieuwe chat",
+      title: colleagueId
+        ? `Nieuwe chat met ${COLLEAGUE_NAMES[colleagueId] ?? colleagueId}`
+        : "Nieuwe chat",
       messages: [],
       threadId: null,
+      colleagueId: colleagueId || null,
       createdAt: Date.now(),
       lastMessageAt: Date.now(),
     };
 
-    setChatSessions((prev) => [newSession, ...prev].slice(0, 50)); // Keep max 50 chats
+    setChatSessions((prev) => [newSession, ...prev].slice(0, 50));
     setActiveChatId(newSession.id);
+  };
+
+  const handleSelectColleague = (colleagueId: string) => {
+    setSelectedColleague(colleagueId);
+    const existingSession = chatSessions.find((session) => session.colleagueId === colleagueId);
+
+    if (existingSession) {
+      setActiveChatId(existingSession.id);
+    } else {
+      handleNewChat(colleagueId);
+    }
   };
 
   const handleSelectChat = (chatId: string) => {
@@ -94,6 +112,7 @@ const Index = () => {
       const remainingSessions = chatSessions.filter((s) => s.id !== chatId);
       if (remainingSessions.length > 0) {
         setActiveChatId(remainingSessions[0].id);
+        setSelectedColleague(remainingSessions[0].colleagueId);
       } else {
         handleNewChat();
       }
@@ -118,6 +137,7 @@ const Index = () => {
           title,
           messages,
           threadId,
+          colleagueId: selectedColleague,
           createdAt: Date.now(),
           lastMessageAt: Date.now(),
         };
@@ -127,16 +147,18 @@ const Index = () => {
 
       // Update existing session
       const updatedSessions = [...prev];
+      const existingSession = updatedSessions[sessionIndex];
       const firstUserMessage = messages.find((m) => m.role === "user");
       const title = firstUserMessage
         ? firstUserMessage.content.slice(0, 50) + (firstUserMessage.content.length > 50 ? "..." : "")
-        : updatedSessions[sessionIndex].title;
+        : existingSession.title;
 
       updatedSessions[sessionIndex] = {
-        ...updatedSessions[sessionIndex],
+        ...existingSession,
         title,
         messages,
         threadId,
+        colleagueId: existingSession.colleagueId ?? selectedColleague ?? null,
         lastMessageAt: Date.now(),
       };
 
@@ -150,7 +172,7 @@ const Index = () => {
     <div className="flex h-screen bg-background overflow-hidden">
       <ChatSidebar
         selectedColleague={selectedColleague}
-        onSelectColleague={setSelectedColleague}
+        onSelectColleague={handleSelectColleague}
         onNewChat={handleNewChat}
         chatSessions={chatSessions}
         activeChatId={activeChatId}

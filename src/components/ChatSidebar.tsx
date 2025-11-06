@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link } from "react-router-dom";
-import engineerAvatar from "@/assets/engineer-avatar.png";
-import henkAvatar from "@/assets/henk-avatar.png";
-import hrAvatar from "@/assets/hr-avatar.png";
+import claireAvatar from "@/assets/claire.jpg";
+import tomAvatar from "@/assets/tom.jpg";
+import remcoAvatar from "@/assets/remco.jpg";
 import poolLogo from "@/assets/pool-logo.png";
 import uploadIcon from "@/assets/upload-icon.png";
 import { ChatSession } from "@/types/chat";
@@ -16,16 +16,16 @@ interface Colleague {
   avatar: string;
 }
 
-const colleagues: Colleague[] = [
-  { id: "claire", name: "Claire", avatar: hrAvatar },
-  { id: "tom", name: "Tom", avatar: henkAvatar },
-  { id: "roos", name: "Roos", avatar: engineerAvatar },
+export const colleagues: Colleague[] = [
+  { id: "claire", name: "Claire", avatar: claireAvatar },
+  { id: "tom", name: "Tom", avatar: tomAvatar },
+  { id: "remco", name: "Remco", avatar: remcoAvatar },
 ];
 
 interface ChatSidebarProps {
   selectedColleague: string | null;
   onSelectColleague: (id: string) => void;
-  onNewChat?: () => void;
+  onNewChat?: (colleagueId: string | null) => void;
   chatSessions: ChatSession[];
   activeChatId: string | null;
   onSelectChat: (chatId: string) => void;
@@ -41,10 +41,9 @@ export const ChatSidebar = ({
   onSelectChat,
   onDeleteChat
 }: ChatSidebarProps) => {
-  const handleColleagueClick = (colleagueId: string) => {
-    onSelectColleague(colleagueId);
-    onNewChat?.();
-  };
+  const filteredSessions = selectedColleague
+    ? chatSessions.filter((session) => session.colleagueId === selectedColleague)
+    : chatSessions;
 
   const formatTimestamp = (timestamp: number) => {
     const now = Date.now();
@@ -65,7 +64,7 @@ export const ChatSidebar = ({
       {/* New Chat Button */}
       <div className="p-4">
         <Button 
-          onClick={onNewChat}
+          onClick={() => onNewChat?.(selectedColleague)}
           className="w-full justify-start gap-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
         >
           <div className="w-6 h-6 rounded-full bg-primary-foreground/20 flex items-center justify-center">
@@ -85,7 +84,7 @@ export const ChatSidebar = ({
             return (
               <button
                 key={colleague.id}
-                onClick={() => handleColleagueClick(colleague.id)}
+                onClick={() => onSelectColleague(colleague.id)}
                 className={`relative w-full flex items-center gap-3 rounded-2xl border border-transparent bg-card px-5 py-3 text-left transition-all shadow-sm ${
                   isSelected
                     ? "border-amber-300/80 shadow-md bg-card"
@@ -108,12 +107,12 @@ export const ChatSidebar = ({
         </div>
         <ScrollArea className="flex-1">
           <div className="space-y-1 pr-4 pb-4">
-            {chatSessions.length === 0 ? (
+            {filteredSessions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Geen recente chats. Start een gesprek door op een collega te klikken.
               </p>
             ) : (
-              chatSessions.slice(0, 15).map((session) => (
+              filteredSessions.slice(0, 15).map((session) => (
                 <button
                   key={session.id}
                   onClick={() => onSelectChat(session.id)}
