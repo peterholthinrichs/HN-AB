@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { FunnelState, DEFAULT_FUNNEL } from "@/types/funnel";
 
 const suggestions = [
-  "Welke sensoren (Shr2, Shr3, Shr4, Shr8) zijn verplicht voor een veilige werking van de warmteterugwinning, en waar worden ze geplaatst?",
+  "Hoe verloopt de beoordelingsprocedure van de aanbesteding volgens het vraagdocument, en welke criteria worden gehanteerd bij de gunning?",
   "Hoe regelt de AK-PC 782A de condensatiedruk tijdens de transkritische en subkritische fasen bij actieve warmteterugwinning?",
   "Hoe werkt de RTK ELECTRISCHE AANDRIJVING RE-ACT 30E/DC?",
 ];
