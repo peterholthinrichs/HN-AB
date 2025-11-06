@@ -1,7 +1,6 @@
-import { Plus, ChevronDown, ChevronRight, MessageSquare, X } from "lucide-react";
+import { Plus, MessageSquare, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link } from "react-router-dom";
 import engineerAvatar from "@/assets/engineer-avatar.png";
@@ -10,17 +9,17 @@ import hrAvatar from "@/assets/hr-avatar.png";
 import poolLogo from "@/assets/pool-logo.png";
 import uploadIcon from "@/assets/upload-icon.png";
 import { ChatSession } from "@/types/chat";
-import { useState } from "react";
 
 interface Colleague {
   id: string;
   name: string;
-  role: string;
-  avatar?: string;
+  avatar: string;
 }
 
 const colleagues: Colleague[] = [
-  { id: "1", name: "Engineer", role: "Holiday ICE", avatar: engineerAvatar },
+  { id: "claire", name: "Claire", avatar: hrAvatar },
+  { id: "tom", name: "Tom", avatar: henkAvatar },
+  { id: "roos", name: "Roos", avatar: engineerAvatar },
 ];
 
 interface ChatSidebarProps {
@@ -42,7 +41,10 @@ export const ChatSidebar = ({
   onSelectChat,
   onDeleteChat
 }: ChatSidebarProps) => {
-  const [isEngineerExpanded, setIsEngineerExpanded] = useState(true);
+  const handleColleagueClick = (colleagueId: string) => {
+    onSelectColleague(colleagueId);
+    onNewChat?.();
+  };
 
   const formatTimestamp = (timestamp: number) => {
     const now = Date.now();
@@ -76,103 +78,81 @@ export const ChatSidebar = ({
       {/* Colleagues Section */}
       <div className="flex-1 px-4 overflow-hidden flex flex-col">
         <h3 className="text-sm font-medium text-foreground mb-3">Collega's</h3>
-        <ScrollArea className="flex-1">
-          <div className="space-y-1 pr-4">
-            {colleagues.map((colleague) => {
-              const isLocked = colleague.role === "LOCKED";
-              const isEngineer = colleague.id === "1";
-              const engineerChats = isEngineer ? chatSessions : [];
+        <div className="space-y-2 mb-4">
+          {colleagues.map((colleague) => {
+            const isSelected = selectedColleague === colleague.id;
 
-              return (
-                <div key={colleague.id}>
-                  {/* Colleague Header */}
-                  <button
-                    onClick={() => {
-                      if (!isLocked) {
-                        if (isEngineer) {
-                          setIsEngineerExpanded(!isEngineerExpanded);
-                        }
-                        onSelectColleague(colleague.id);
+            return (
+              <button
+                key={colleague.id}
+                onClick={() => handleColleagueClick(colleague.id)}
+                className={`relative w-full flex items-center gap-3 rounded-2xl border border-transparent bg-card px-5 py-3 text-left transition-all shadow-sm ${
+                  isSelected
+                    ? "border-amber-300/80 shadow-md bg-card"
+                    : "hover:border-amber-200 hover:shadow-md"
+                }`}
+              >
+                {isSelected && (
+                  <span className="absolute left-0 top-1/2 h-10 w-1 -translate-y-1/2 rounded-full bg-amber-400"></span>
+                )}
+                <Avatar className="w-12 h-12">
+                  <AvatarImage src={colleague.avatar} />
+                  <AvatarFallback className="bg-muted text-foreground">
+                    {colleague.name[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="font-medium text-foreground text-sm">{colleague.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        <ScrollArea className="flex-1">
+          <div className="space-y-1 pr-4 pb-4">
+            {chatSessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Geen recente chats. Start een gesprek door op een collega te klikken.
+              </p>
+            ) : (
+              chatSessions.slice(0, 15).map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => onSelectChat(session.id)}
+                  className={`w-full flex items-start gap-2 p-2 rounded-lg transition-colors text-left group ${
+                    activeChatId === session.id
+                      ? "bg-primary/10 border border-primary"
+                      : "hover:bg-muted/50"
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-foreground line-clamp-2 break-words">
+                      {session.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {formatTimestamp(session.lastMessageAt)}
+                    </p>
+                  </div>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteChat(session.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.stopPropagation();
+                        onDeleteChat(session.id);
                       }
                     }}
-                    disabled={isLocked}
-                    className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left ${
-                      isLocked ? "opacity-60 cursor-not-allowed" : "hover:bg-muted/50 cursor-pointer"
-                    }`}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive flex-shrink-0 cursor-pointer"
+                    aria-label="Chat verwijderen"
                   >
-                    <Avatar className="w-10 h-10">
-                      <AvatarImage src={colleague.avatar} />
-                      <AvatarFallback className="bg-muted text-foreground">{colleague.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground text-sm">{colleague.name}</span>
-                        {isEngineer && engineerChats.length > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            {engineerChats.length}
-                          </Badge>
-                        )}
-                      </div>
-                      <span className="text-muted-foreground text-xs">{colleague.role}</span>
-                    </div>
-                    {isEngineer && engineerChats.length > 0 && (
-                      <div className="text-muted-foreground">
-                        {isEngineerExpanded ? (
-                          <ChevronDown className="w-4 h-4" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4" />
-                        )}
-                      </div>
-                    )}
-                  </button>
-
-                  {/* Engineer Chat Sessions */}
-                  {isEngineer && isEngineerExpanded && engineerChats.length > 0 && (
-                    <div className="ml-4 mt-1 space-y-1">
-                      {engineerChats.slice(0, 15).map((session) => (
-                        <button
-                          key={session.id}
-                          onClick={() => onSelectChat(session.id)}
-                          className={`w-full flex items-start gap-2 p-2 rounded-lg transition-colors text-left group ${
-                            activeChatId === session.id
-                              ? "bg-primary/10 border border-primary"
-                              : "hover:bg-muted/50"
-                          }`}
-                        >
-                          <MessageSquare className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-foreground line-clamp-2 break-words">
-                              {session.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {formatTimestamp(session.lastMessageAt)}
-                            </p>
-                          </div>
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteChat(session.id);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.stopPropagation();
-                                onDeleteChat(session.id);
-                              }
-                            }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive flex-shrink-0 cursor-pointer"
-                            aria-label="Chat verwijderen"
-                          >
-                            <X className="w-4 h-4" />
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    <X className="w-4 h-4" />
+                  </span>
+                </button>
+              ))
+            )}
           </div>
         </ScrollArea>
       </div>

@@ -6,7 +6,7 @@ import { ChatSession, Message } from "@/types/chat";
 const STORAGE_KEY = "engineer-chat-sessions";
 
 const Index = () => {
-  const [selectedColleague, setSelectedColleague] = useState<string | null>("1");
+  const [selectedColleague, setSelectedColleague] = useState<string | null>("claire");
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
