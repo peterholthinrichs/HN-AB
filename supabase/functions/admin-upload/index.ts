@@ -8,6 +8,7 @@ const corsHeaders = {
 interface UploadRequest {
   filename: string;
   fileBase64: string;
+  vectorStoreId: string;
 }
 
 async function verifyJWT(token: string, secret: string): Promise<boolean> {
@@ -77,11 +78,11 @@ Deno.serve(async (req) => {
 
     // Parse request body
     const body: UploadRequest = await req.json();
-    const { filename, fileBase64 } = body;
+    const { filename, fileBase64, vectorStoreId } = body;
 
-    if (!filename || !fileBase64) {
+    if (!filename || !fileBase64 || !vectorStoreId) {
       return new Response(
-        JSON.stringify({ error: 'Missing filename or fileBase64' }),
+        JSON.stringify({ error: 'Missing filename, fileBase64 or vectorStoreId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -120,6 +121,11 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      throw new Error('OPENAI_API_KEY not configured');
+    }
+
     // Upload to storage
     const { error: uploadError } = await supabase.storage
       .from('documents')
@@ -136,8 +142,61 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Upload file to OpenAI
+    const fileBlob = new Blob([bytes], { type: 'application/pdf' });
+    const formData = new FormData();
+    formData.append('file', fileBlob, filename);
+    formData.append('purpose', 'assistants');
+
+    const openAiUploadResponse = await fetch('https://api.openai.com/v1/files', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!openAiUploadResponse.ok) {
+      const errorText = await openAiUploadResponse.text().catch(() => '');
+      console.error('OpenAI file upload failed:', errorText);
+      return new Response(
+        JSON.stringify({ error: 'OpenAI file upload failed' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const openAiFileData = await openAiUploadResponse.json();
+    const fileId = openAiFileData?.id;
+
+    if (!fileId) {
+      console.error('OpenAI file upload missing id:', openAiFileData);
+      return new Response(
+        JSON.stringify({ error: 'OpenAI file upload did not return file id' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Attach file to vector store
+    const attachResponse = await fetch(`https://api.openai.com/v1/vector_stores/${vectorStoreId}/files`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ file_id: fileId }),
+    });
+
+    if (!attachResponse.ok) {
+      const errorText = await attachResponse.text().catch(() => '');
+      console.error('Failed to attach file to vector store:', errorText);
+      return new Response(
+        JSON.stringify({ error: 'OpenAI vector store attachment failed' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ success: true, filename }),
+      JSON.stringify({ success: true, filename, fileId }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
