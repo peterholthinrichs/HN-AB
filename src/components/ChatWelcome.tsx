@@ -9,6 +9,13 @@ import { getAuthToken } from "@/lib/auth";
 import DOMPurify from "dompurify";
 import { supabase } from "@/integrations/supabase/client";
 import { FunnelState, DEFAULT_FUNNEL } from "@/types/funnel";
+import { cn } from "@/lib/utils";
+
+interface MentionCandidate {
+  id: string;
+  name: string;
+  avatar: string;
+}
 
 const suggestions = [
   "Stel een feitelijke, empathische terugkoppeling op voor een 2-spoortraject.",
@@ -22,6 +29,7 @@ interface ChatWelcomeProps {
   selectedColleague: string | null;
   assistantMap: Record<string, string>;
   colleagueNames: Record<string, string>;
+  colleagueDirectory?: MentionCandidate[];
 }
 
 export const ChatWelcome = ({
@@ -30,6 +38,7 @@ export const ChatWelcome = ({
   selectedColleague,
   assistantMap,
   colleagueNames,
+  colleagueDirectory = [],
 }: ChatWelcomeProps) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>(currentSession?.messages || []);
@@ -43,6 +52,12 @@ export const ChatWelcome = ({
   } | null>(null);
   const [funnelState, setFunnelState] = useState<FunnelState | null>(null);
   const { toast } = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const [isMentionOpen, setIsMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
+  const [highlightIndex, setHighlightIndex] = useState(0);
 
   // Update session when messages or threadId change
   useEffect(() => {
@@ -418,10 +433,11 @@ Beantwoord de vraag op basis van de technische documentatie.
         <div className="w-full max-w-2xl mb-8">
           <div className="relative">
             <input
+              ref={inputRef}
               type="text"
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              onChange={(e) => handleMessageChange(e)}
+              onKeyDown={(e) => handleInputKeyDown(e)}
               placeholder={
                 funnelState?.isActive
                   ? funnelState.questions[funnelState.currentStep].placeholder || "Type je antwoord..."
@@ -430,6 +446,32 @@ Beantwoord de vraag op basis van de technische documentatie.
               className="w-full px-6 py-4 pr-14 rounded-2xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring shadow-sm"
               disabled={isLoading}
             />
+            {isMentionOpen && filteredMentions.length > 0 && (
+              <div className="absolute left-6 right-6 top-full mt-2 z-50 rounded-2xl border border-border bg-card shadow-lg overflow-hidden">
+                {filteredMentions.map((colleague, idx) => (
+                  <button
+                    key={colleague.id}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleMentionSelect(colleague);
+                    }}
+                    className={cn(
+                      "flex items-center gap-3 w-full px-3 py-2 text-sm",
+                      idx === highlightIndex ? "bg-muted" : "hover:bg-muted/60"
+                    )}
+                  >
+                    <img
+                      src={colleague.avatar}
+                      alt={colleague.name}
+                      className="w-6 h-6 rounded-full object-cover"
+                    />
+                    <span>{colleague.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">@{colleague.id}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <Button
               size="icon"
               onClick={handleSend}
