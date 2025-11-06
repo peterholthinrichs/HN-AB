@@ -125,7 +125,7 @@ serve(async (req) => {
     
     console.log("JWT verification passed successfully");
 
-    const { message, threadId } = await req.json();
+    const { message, threadId, assistantKey } = await req.json();
     
     // Validate message
     if (!message || typeof message !== 'string') {
@@ -144,8 +144,30 @@ serve(async (req) => {
       );
     }
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    const ASSISTANT_ID = "asst_u9SBVjdEmMgEyJtXkiOSkZMD";
-    const VECTOR_STORE_ID = "vs_68ef575ffe4881918c0524c389babc60";
+
+    const ASSISTANT_CONFIG: Record<string, { assistantId: string; vectorStoreId: string }> = {
+      claire: {
+        assistantId: "asst_RV73BLM5HB6ScbYIujNVJH6f",
+        vectorStoreId: "vs_690c9a2e07d081919ae20372ca09ba23",
+      },
+      tom: {
+        assistantId: "asst_FYWjsbBhjC3WL4U2mgr5ySaA",
+        vectorStoreId: "vs_690c9a35c7748191a6246c83b32d9201",
+      },
+      remco: {
+        assistantId: "asst_UaYD6dZC7qxCCjZUWiWHtply",
+        vectorStoreId: "vs_690c9a3aff8c81918028f30dcc42090e",
+      },
+    };
+
+    const selectedAssistant = assistantKey ? ASSISTANT_CONFIG[assistantKey] : undefined;
+    if (!selectedAssistant) {
+      console.error('Onbekende of ontbrekende assistantKey ontvangen:', assistantKey);
+      return new Response(
+        JSON.stringify({ error: 'Onbekende assistant' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (!OPENAI_API_KEY) {
       console.error('OPENAI_API_KEY not configured');
@@ -278,7 +300,7 @@ serve(async (req) => {
         'OpenAI-Beta': 'assistants=v2'
       },
       body: JSON.stringify({
-        assistant_id: ASSISTANT_ID,
+        assistant_id: selectedAssistant.assistantId,
         stream: true,
         additional_instructions: `Belangrijk: 
 1. Geef je antwoord ALTIJD in het Nederlands, ongeacht de taal waarin de vraag wordt gesteld
@@ -287,7 +309,7 @@ serve(async (req) => {
 4. Zonder citations is je antwoord ONVOLLEDIG`,
         tool_resources: {
           file_search: {
-            vector_store_ids: [VECTOR_STORE_ID]
+            vector_store_ids: [selectedAssistant.vectorStoreId]
           }
         }
       })
