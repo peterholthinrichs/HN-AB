@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChatSidebar, colleagues } from "@/components/ChatSidebar";
+import { ChatSidebar, colleagues, colleagueAssistantMap } from "@/components/ChatSidebar";
 import { ChatWelcome } from "@/components/ChatWelcome";
 import { ChatSession, Message } from "@/types/chat";
 
@@ -180,7 +180,13 @@ const Index = () => {
         onDeleteChat={handleDeleteChat}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
-        <ChatWelcome currentSession={currentSession} onSessionUpdate={handleSessionUpdate} />
+        <ChatWelcome
+          currentSession={currentSession}
+          onSessionUpdate={handleSessionUpdate}
+          selectedColleague={selectedColleague}
+          assistantMap={colleagueAssistantMap}
+          colleagueNames={COLLEAGUE_NAMES}
+        />
       </main>
     </div>
   );

@@ -19,9 +19,18 @@ const suggestions = [
 interface ChatWelcomeProps {
   currentSession: ChatSession | null;
   onSessionUpdate: (messages: Message[], threadId: string | null) => void;
+  selectedColleague: string | null;
+  assistantMap: Record<string, string>;
+  colleagueNames: Record<string, string>;
 }
 
-export const ChatWelcome = ({ currentSession, onSessionUpdate }: ChatWelcomeProps) => {
+export const ChatWelcome = ({
+  currentSession,
+  onSessionUpdate,
+  selectedColleague,
+  assistantMap,
+  colleagueNames,
+}: ChatWelcomeProps) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>(currentSession?.messages || []);
   const [isLoading, setIsLoading] = useState(false);
@@ -147,10 +156,23 @@ Beantwoord de vraag op basis van de technische documentatie.
     }
   };
 
-  const streamResponse = async (userMessage: string): Promise<void> => {
+  const streamResponse = async (
+    userMessage: string,
+    options?: {
+      assistantKey?: string | null;
+      label?: string;
+    }
+  ): Promise<{ threadId: string | null }> => {
     const token = getAuthToken();
     if (!token) {
       throw new Error("Niet geauthenticeerd");
+    }
+
+    const assistantKey = options?.assistantKey ?? selectedColleague ?? null;
+    const assistantId = assistantKey ? assistantMap[assistantKey] : undefined;
+
+    if (!assistantId) {
+      throw new Error("Geen assistant gevonden voor deze collega");
     }
 
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-chat`, {
@@ -163,6 +185,7 @@ Beantwoord de vraag op basis van de technische documentatie.
       body: JSON.stringify({
         message: userMessage,
         threadId: threadId,
+        assistantKey,
       }),
     });
 
@@ -187,6 +210,7 @@ Beantwoord de vraag op basis van de technische documentatie.
     const decoder = new TextDecoder();
     let buffer = "";
     let streamedText = "";
+    let updatedThreadId: string | null = threadId;
 
     if (!reader) {
       throw new Error("No response body");
@@ -230,14 +254,19 @@ Beantwoord de vraag op basis van de technische documentatie.
 
             if (parsed.type === "thread" && parsed.threadId) {
               setThreadId(parsed.threadId);
+              updatedThreadId = parsed.threadId;
             } else if (parsed.type === "token" && parsed.content) {
               streamedText += parsed.content;
               // Update the last message with accumulated text
               setMessages((prev) => {
                 const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                const assistantLabel = options?.label || (assistantKey ? colleagueNames[assistantKey] : undefined);
                 newMessages[newMessages.length - 1] = {
                   role: "assistant",
                   content: streamedText,
+                  assistantId: assistantKey ?? selectedColleague ?? null,
+                  assistantLabel,
                 };
                 return newMessages;
               });
@@ -245,9 +274,11 @@ Beantwoord de vraag op basis van de technische documentatie.
               // Add citations to the last message
               setMessages((prev) => {
                 const newMessages = [...prev];
+                const assistantLabel = options?.label || (assistantKey ? colleagueNames[assistantKey] : undefined);
                 newMessages[newMessages.length - 1] = {
                   ...newMessages[newMessages.length - 1],
                   citations: parsed.citations,
+                  assistantLabel,
                 };
                 return newMessages;
               });
@@ -312,14 +343,55 @@ Beantwoord de vraag op basis van de technische documentatie.
 
     // Normale chat (na funnel)
     setMessages((prev) => [...prev, { role: "user", content: trimmedMessage }]);
+
+    // Detect mentions
+    const mentionRegex = /@([a-z0-9_-]+)/gi;
+    const mentionedColleagues = Array.from(
+      new Set(
+        [...trimmedMessage.matchAll(mentionRegex)]
+          .map((match) => match[1].toLowerCase())
+          .filter((id) => assistantMap[id])
+      )
+    ).filter((id) => id !== selectedColleague);
+
     setIsLoading(true);
 
-    // Add empty assistant message for streaming
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+    // Add empty assistant message for primary colleague
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: "",
+        assistantId: selectedColleague,
+        assistantLabel: selectedColleague ? colleagueNames[selectedColleague] : undefined,
+      },
+    ]);
 
     try {
       console.log("Streaming message...");
-      await streamResponse(trimmedMessage);
+      const { threadId: latestThreadId } = await streamResponse(trimmedMessage, {
+        assistantKey: selectedColleague ?? null,
+        label: selectedColleague ? colleagueNames[selectedColleague] : undefined,
+      });
+
+      // Sequentially gather input from mentioned colleagues
+      for (const colleagueId of mentionedColleagues) {
+        // Insert a placeholder bubble for this colleague
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "",
+            assistantId: colleagueId,
+            assistantLabel: colleagueNames[colleagueId] ?? colleagueId,
+          },
+        ]);
+
+        await streamResponse(trimmedMessage, {
+          assistantKey: colleagueId,
+          label: colleagueNames[colleagueId] ?? colleagueId,
+        });
+      }
     } catch (error) {
       console.error("Error:", error);
       toast({
@@ -327,8 +399,8 @@ Beantwoord de vraag op basis van de technische documentatie.
         description: error instanceof Error ? error.message : "Er is een fout opgetreden",
         variant: "destructive",
       });
-      // Remove the empty assistant message on error
-      setMessages((prev) => prev.slice(0, -1));
+      // Remove the empty assistant messages on error
+      setMessages((prev) => prev.filter((msg) => msg.content !== "" || msg.role !== "assistant"));
     } finally {
       setIsLoading(false);
     }

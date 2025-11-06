@@ -14,13 +14,18 @@ interface Colleague {
   id: string;
   name: string;
   avatar: string;
+  assistantId: string;
 }
 
 export const colleagues: Colleague[] = [
-  { id: "claire", name: "Claire", avatar: claireAvatar },
-  { id: "tom", name: "Tom", avatar: tomAvatar },
-  { id: "remco", name: "Remco", avatar: remcoAvatar },
+  { id: "claire", name: "Claire", avatar: claireAvatar, assistantId: "asst_RV73BLM5HB6ScbYIujNVJH6f" },
+  { id: "tom", name: "Tom", avatar: tomAvatar, assistantId: "asst_FYWjsbBhjC3WL4U2mgr5ySaA" },
+  { id: "remco", name: "Remco", avatar: remcoAvatar, assistantId: "asst_UaYD6dZC7qxCCjZUWiWHtply" },
 ];
+
+export const colleagueAssistantMap = Object.fromEntries(
+  colleagues.map(({ id, assistantId }) => [id, assistantId])
+);
 
 interface ChatSidebarProps {
   selectedColleague: string | null;
