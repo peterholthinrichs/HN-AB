@@ -398,15 +398,15 @@ export const ChatWelcome = ({
     setIsLoading(true);
 
     // Add empty assistant message for primary colleague
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "assistant",
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
         content: "",
         assistantId: selectedColleague,
         assistantLabel: selectedColleague ? colleagueNames[selectedColleague] : undefined,
-      },
-    ]);
+        },
+      ]);
 
     try {
       console.log("Streaming message...");

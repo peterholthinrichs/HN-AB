@@ -261,7 +261,7 @@ export default function AdminUpload() {
       }
 
       toast.success(`${filenames.length} bestand${filenames.length !== 1 ? 'en' : ''} verwijderd`);
-
+      
       await fetchExistingFiles();
       setSelectedForDelete(new Set());
     } catch (error) {

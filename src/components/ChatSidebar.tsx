@@ -83,11 +83,11 @@ export const ChatSidebar = ({
       <div className="flex-1 px-4 overflow-hidden flex flex-col">
         <h3 className="text-sm font-medium text-foreground mb-3">Collega's</h3>
         <div className="space-y-2 mb-4">
-          {colleagues.map((colleague) => {
+            {colleagues.map((colleague) => {
             const isSelected = selectedColleague === colleague.id;
 
-            return (
-              <button
+              return (
+                  <button
                 key={colleague.id}
                 onClick={() => onSelectColleague(colleague.id)}
                 className={`relative w-full flex items-center gap-3 rounded-2xl border border-transparent bg-card px-5 py-3 text-left transition-all shadow-sm ${
@@ -100,16 +100,16 @@ export const ChatSidebar = ({
                   <span className="absolute left-0 top-1/2 h-10 w-1 -translate-y-1/2 rounded-full bg-amber-400"></span>
                 )}
                 <Avatar className="w-12 h-12">
-                  <AvatarImage src={colleague.avatar} />
+                      <AvatarImage src={colleague.avatar} />
                   <AvatarFallback className="bg-muted text-foreground">
                     {colleague.name[0]}
                   </AvatarFallback>
-                </Avatar>
-                <span className="font-medium text-foreground text-sm">{colleague.name}</span>
+                    </Avatar>
+                        <span className="font-medium text-foreground text-sm">{colleague.name}</span>
               </button>
             );
           })}
-        </div>
+                      </div>
         <ScrollArea className="flex-1">
           <div className="space-y-1 pr-4 pb-4">
             {filteredSessions.length === 0 ? (
@@ -118,45 +118,45 @@ export const ChatSidebar = ({
               </p>
             ) : (
               filteredSessions.slice(0, 15).map((session) => (
-                <button
-                  key={session.id}
-                  onClick={() => onSelectChat(session.id)}
-                  className={`w-full flex items-start gap-2 p-2 rounded-lg transition-colors text-left group ${
-                    activeChatId === session.id
-                      ? "bg-primary/10 border border-primary"
-                      : "hover:bg-muted/50"
-                  }`}
-                >
-                  <MessageSquare className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-foreground line-clamp-2 break-words">
-                      {session.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatTimestamp(session.lastMessageAt)}
-                    </p>
-                  </div>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteChat(session.id);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.stopPropagation();
-                        onDeleteChat(session.id);
-                      }
-                    }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive flex-shrink-0 cursor-pointer"
-                    aria-label="Chat verwijderen"
-                  >
-                    <X className="w-4 h-4" />
-                  </span>
-                </button>
+                        <button
+                          key={session.id}
+                          onClick={() => onSelectChat(session.id)}
+                          className={`w-full flex items-start gap-2 p-2 rounded-lg transition-colors text-left group ${
+                            activeChatId === session.id
+                              ? "bg-primary/10 border border-primary"
+                              : "hover:bg-muted/50"
+                          }`}
+                        >
+                          <MessageSquare className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-foreground line-clamp-2 break-words">
+                              {session.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {formatTimestamp(session.lastMessageAt)}
+                            </p>
+                          </div>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteChat(session.id);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                onDeleteChat(session.id);
+                              }
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive flex-shrink-0 cursor-pointer"
+                            aria-label="Chat verwijderen"
+                          >
+                            <X className="w-4 h-4" />
+                          </span>
+                        </button>
               ))
-            )}
+                  )}
           </div>
         </ScrollArea>
       </div>

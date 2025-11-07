@@ -2,6 +2,8 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   citations?: Array<{ file_id: string; filename?: string; quote?: string }>;
+  assistantId?: string | null;
+  assistantLabel?: string;
 }
 
 export interface ChatSession {
