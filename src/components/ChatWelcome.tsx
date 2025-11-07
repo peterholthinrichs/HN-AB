@@ -60,7 +60,11 @@ export const ChatWelcome = ({
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [highlightIndex, setHighlightIndex] = useState(0);
 
- const closeMentionMenu = () => {
+  const avatarMap = useMemo(() => {
+    return Object.fromEntries(colleagueDirectory.map((colleague) => [colleague.id, colleague.avatar]));
+  }, [colleagueDirectory]);
+
+const closeMentionMenu = () => {
    setIsMentionOpen(false);
    setMentionQuery("");
    setMentionStart(null);
@@ -530,18 +534,28 @@ export const ChatWelcome = ({
     <div className="flex-1 flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-8 space-y-6">
         <div className="max-w-4xl mx-auto">
-          {messages.map((msg, index) => (
-            <div key={index} className={`flex gap-4 mb-6 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              {msg.role === "assistant" && (
-                <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
-                  <img src={logo} alt="AI" className="w-full h-full object-contain" />
-                </div>
-              )}
+          {messages.map((msg, index) => {
+            const isAssistant = msg.role === "assistant";
+            const avatarSrc = msg.assistantId && avatarMap[msg.assistantId] ? avatarMap[msg.assistantId] : logo;
+            return (
               <div
-                className={`max-w-[70%] p-4 rounded-2xl ${
-                  msg.role === "user" ? "bg-foreground text-background" : "bg-card border border-border text-foreground"
-                }`}
+                key={index}
+                className={`flex gap-4 mb-6 ${isAssistant ? "justify-start" : "justify-end"} items-start`}
               >
+                {isAssistant && (
+                  <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 rounded-full overflow-hidden bg-accent/60">
+                    <img
+                      src={avatarSrc}
+                      alt={msg.assistantLabel || "assistant"}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                <div
+                  className={`max-w-[70%] p-4 rounded-2xl ${
+                    msg.role === "user" ? "bg-foreground text-background" : "bg-card border border-border text-foreground"
+                  }`}
+                >
                 {msg.content ? (
                   <>
                     <div
@@ -647,8 +661,9 @@ export const ChatWelcome = ({
                   </div>
                 )}
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
       </div>
